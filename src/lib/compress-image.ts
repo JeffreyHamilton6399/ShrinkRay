@@ -3,7 +3,7 @@
  * Everything runs in the browser — no uploads, fully private.
  */
 
-export type ImageTargetFormat = "image/jpeg" | "image/webp" | "image/png";
+export type ImageTargetFormat = "image/jpeg" | "image/webp" | "image/png" | "image/avif";
 
 export interface CompressImageOptions {
   quality: number; // 0..1 (ignored for png)
@@ -23,6 +23,7 @@ export interface CompressedImage {
 export function extensionFor(format: ImageTargetFormat): string {
   if (format === "image/jpeg") return "jpg";
   if (format === "image/webp") return "webp";
+  if (format === "image/avif") return "avif";
   return "png";
 }
 

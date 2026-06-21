@@ -156,8 +156,9 @@ export function ImageCompressor({ file, onClear }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="image/jpeg">JPEG</SelectItem>
                 <SelectItem value="image/webp">WebP</SelectItem>
+                <SelectItem value="image/avif">AVIF</SelectItem>
+                <SelectItem value="image/jpeg">JPEG</SelectItem>
                 <SelectItem value="image/png">PNG</SelectItem>
               </SelectContent>
             </Select>

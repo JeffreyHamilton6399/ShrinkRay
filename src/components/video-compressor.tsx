@@ -128,6 +128,7 @@ export function VideoCompressor({ file, onClear }: Props) {
           quality,
           targetHeight,
           fps: SPEED_PRESETS[speedPreset].fps,
+          encodeMode: speedPreset === "best" ? "quality" : "speed",
           format,
           signal: controller.signal,
           onProgress: (ratio) => {

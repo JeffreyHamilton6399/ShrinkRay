@@ -22,6 +22,8 @@ export interface CompressVideoOptions {
   targetHeight: number;
   fps?: number; // target framerate (default 24)
   format: VideoTargetFormat;
+  /** "speed" = fastest (ultrafast, no B-frames), "quality" = better encode (fast preset, B-frames) */
+  encodeMode?: "speed" | "quality";
   signal?: AbortSignal;
   onProgress?: (ratio: number) => void;
   onStatus?: (status: "loading-engine" | "compressing") => void;
@@ -173,16 +175,21 @@ async function compressWithFFmpeg(
   args.push("-vf", filters.join(","));
 
   if (isMp4) {
-    args.push(
+    const qualityMode = opts.encodeMode === "quality";
+    const x264Args = [
       "-c:v", "libx264",
-      "-preset", "ultrafast",
-      "-tune", "zerolatency",
+      "-preset", qualityMode ? "fast" : "ultrafast",
+    ];
+    // zerolatency tune only for speed mode — it hurts file compression quality
+    if (!qualityMode) x264Args.push("-tune", "zerolatency");
+    x264Args.push(
       "-crf", String(crf),
       "-pix_fmt", "yuv420p",
-      "-g", "240",            // 10-second keyframes (fewer = faster)
-      "-bf", "0",             // no B-frames (faster decode + encode)
-      "-c:a", "copy"          // copy audio (no re-encode = free)
+      "-g", "240",
+      "-bf", qualityMode ? "3" : "0",  // B-frames improve quality (disabled for speed)
+      "-c:a", "copy"
     );
+    args.push(...x264Args);
   } else {
     args.push(
       "-c:v", "libvpx",
