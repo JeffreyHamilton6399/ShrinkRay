@@ -46,6 +46,23 @@ export function isSupportedVideo(file: File): boolean {
   );
 }
 
+/** Check if a GIF is animated (has multiple frames). */
+export async function isAnimatedGif(file: File): Promise<boolean> {
+  if (!/^image\/gif$/i.test(file.type) && !/\.gif$/i.test(file.name)) {
+    return false;
+  }
+  // GIF animation: scan for multiple Graphic Control Extension blocks (0x21 0xF9)
+  const buf = new Uint8Array(await file.slice(0, 1024 * 1024).arrayBuffer());
+  let count = 0;
+  for (let i = 0; i < buf.length - 1; i++) {
+    if (buf[i] === 0x21 && buf[i + 1] === 0xf9) {
+      count++;
+      if (count > 1) return true; // multiple frames = animated
+    }
+  }
+  return false;
+}
+
 // --- ffmpeg.wasm engine ---
 
 let ffmpegInstance: FFmpeg | null = null;

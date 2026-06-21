@@ -8,7 +8,8 @@ import { VideoCompressor } from "@/components/video-compressor";
 import { AudioCompressor } from "@/components/audio-compressor";
 import { PdfCompressor } from "@/components/pdf-compressor";
 import { FileCompressor } from "@/components/file-compressor";
-import { detectKind, type MediaKind } from "@/lib/detect";
+import { SvgCompressor } from "@/components/svg-compressor";
+import { detectKindAsync, type MediaKind } from "@/lib/detect";
 import { formatBytes, savedPercent, shortFileName } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +26,15 @@ export function Compressor() {
   const [showDrop, setShowDrop] = React.useState(true);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
-  const handleFiles = (dropped: File[]) => {
-    const next: DroppedFile[] = dropped.map((file) => ({
-      id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-      file,
-      kind: detectKind(file),
-    }));
+  const handleFiles = async (dropped: File[]) => {
+    // Detect kind for each file (async because animated GIFs need checking)
+    const next: DroppedFile[] = await Promise.all(
+      dropped.map(async (file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+        file,
+        kind: await detectKindAsync(file),
+      }))
+    );
     setFiles((prev) => [...prev, ...next]);
     setShowDrop(false);
   };
@@ -113,6 +117,7 @@ export function Compressor() {
         {kind === "video" && <VideoCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "audio" && <AudioCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "svg" && <SvgCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "file" && <FileCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
       </div>
     );
@@ -139,6 +144,7 @@ export function Compressor() {
         {kind === "video" && <VideoCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "audio" && <AudioCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={clearAll} />}
+        {kind === "svg" && <SvgCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "file" && <FileCompressor key={key} file={file} onClear={clearAll} />}
       </div>
     );
@@ -339,7 +345,7 @@ function FileRow({
 }
 
 function KindIcon({ kind }: { kind: MediaKind }) {
-  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", file: "📦" };
+  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", svg: "✏️", file: "📦" };
   return <span>{icons[kind]}</span>;
 }
 
@@ -353,6 +359,8 @@ function extFor(blob: Blob): string {
   if (t.includes("jpeg")) return "jpg";
   if (t.includes("webp")) return "webp";
   if (t.includes("png")) return "png";
+  if (t.includes("svg")) return "svg";
+  if (t.includes("avif")) return "avif";
   return "bin";
 }
 
@@ -373,6 +381,11 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   if (kind === "file") {
     const { compressFile } = await import("@/lib/compress-file");
     const r = await compressFile(file);
+    return { blob: r.blob, url: r.url, size: r.size };
+  }
+  if (kind === "svg") {
+    const { compressSvg } = await import("@/lib/compress-svg");
+    const r = await compressSvg(file);
     return { blob: r.blob, url: r.url, size: r.size };
   }
   if (kind === "audio") {

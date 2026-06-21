@@ -28,6 +28,10 @@ export function extensionFor(format: ImageTargetFormat): string {
 }
 
 export function isSupportedImage(file: File): boolean {
+  // SVG is handled separately (compress-svg.ts) — exclude it here
+  if (/^image\/svg\+xml$/i.test(file.type) || /\.svg$/i.test(file.name)) {
+    return false;
+  }
   return /^image\/(png|jpeg|webp|gif|bmp|avif)$/i.test(file.type);
 }
 
