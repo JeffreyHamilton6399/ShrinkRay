@@ -127,34 +127,40 @@ async function compressWithFFmpeg(
   const crf = qualityToCrf(opts.quality, opts.format);
   const args: string[] = ["-i", inputName];
 
-  // Scale filter (keep aspect ratio, ensure even dimensions)
+  // Combined video filter: scale + reduce framerate to 24fps in one pass.
+  // Framerate reduction is the single biggest speedup for ST ffmpeg —
+  // a 60fps source becomes 24fps = 2.5x fewer frames to encode.
+  const filters: string[] = [];
   if (opts.targetHeight > 0) {
     const scale = Math.min(
       1,
       opts.targetHeight / Math.max(srcInfo.width, srcInfo.height)
     );
     const targetH = Math.round((srcInfo.height * scale) / 2) * 2;
-    args.push("-vf", `scale=-2:${targetH}`);
+    filters.push(`scale=-2:${targetH}`);
   }
+  filters.push("fps=24"); // drop to 24fps — fewer frames = faster encode
+  args.push("-vf", filters.join(","));
 
   if (isMp4) {
     args.push(
       "-c:v", "libx264",
       "-preset", "ultrafast",
-      "-tune", "zerolatency",   // faster encoding, minimal buffering
+      "-tune", "zerolatency",
       "-crf", String(crf),
       "-pix_fmt", "yuv420p",
-      "-threads", "0",          // use all available threads
-      "-c:a", "copy"            // copy audio (no re-encode = much faster)
+      "-g", "240",            // 10-second keyframes (fewer = faster)
+      "-bf", "0",             // no B-frames (faster decode + encode)
+      "-c:a", "copy"          // copy audio (no re-encode = free)
     );
   } else {
     args.push(
       "-c:v", "libvpx",
       "-deadline", "realtime",
-      "-cpu-used", "16",        // max speed for VP8
+      "-cpu-used", "16",
       "-crf", String(crf),
       "-b:v", "0",
-      "-row-mt", "1",           // multi-row threading
+      "-g", "240",
       "-c:a", "libopus",
       "-b:a", "96k"
     );
