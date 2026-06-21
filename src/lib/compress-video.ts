@@ -1,16 +1,19 @@
 /**
- * Video compression via ffmpeg.wasm — processes frames as fast as the CPU
- * allows (not bound to real-time playback like MediaRecorder). Uses the
- * single-threaded core for maximum reliability (no COOP/COEP headers needed).
- * The ffmpeg core (~25 MB) is loaded lazily from a CDN on first use, then
- * cached by the browser. Everything runs in the browser — nothing is uploaded.
+ * Video compression via ffmpeg.wasm.
  *
- * Fallback: if ffmpeg.wasm fails to load, falls back to MediaRecorder
- * (real-time) so the tool always works.
+ * Uses the MULTI-THREADED core (2-4x faster) when SharedArrayBuffer is
+ * available (needs COOP/COEP headers, configured in next.config.ts). Falls
+ * back to single-threaded core otherwise. Both cores are self-hosted in
+ * /public/ffmpeg/ (same-origin) so COEP never blocks them.
+ *
+ * The ffmpeg core (~30 MB) loads on first use and is cached by the browser.
+ * Everything runs in the browser — nothing is uploaded.
+ *
+ * If ffmpeg.wasm fails entirely, falls back to MediaRecorder (real-time).
  */
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
-import { toBlobURL, fetchFile } from "@ffmpeg/util";
+import { toBlobURL } from "@ffmpeg/util";
 
 export type VideoTargetFormat = "video/webm" | "video/mp4";
 
@@ -30,7 +33,7 @@ export interface CompressedVideo {
   height: number;
   duration: number;
   mimeType: string;
-  engine: "ffmpeg" | "mediarecorder";
+  engine: "ffmpeg-mt" | "ffmpeg-st" | "mediarecorder";
 }
 
 export function isSupportedVideo(file: File): boolean {
@@ -40,31 +43,49 @@ export function isSupportedVideo(file: File): boolean {
   );
 }
 
-// --- ffmpeg.wasm engine (single-threaded for reliability) ---
-
-const CORE_VERSION = "0.12.10";
-const CORE_BASE = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd`;
+// --- ffmpeg.wasm engine ---
 
 let ffmpegInstance: FFmpeg | null = null;
 let loadPromise: Promise<FFmpeg> | null = null;
+let loadedEngine: "ffmpeg-mt" | "ffmpeg-st" | null = null;
 
-async function loadFFmpeg(onProgress?: (msg: string) => void): Promise<FFmpeg> {
-  if (ffmpegInstance) return ffmpegInstance;
+function hasSharedArrayBuffer(): boolean {
+  return typeof SharedArrayBuffer !== "undefined";
+}
+
+async function loadFFmpeg(): Promise<{ ff: FFmpeg; engine: "ffmpeg-mt" | "ffmpeg-st" }> {
+  if (ffmpegInstance && loadedEngine) {
+    return { ff: ffmpegInstance, engine: loadedEngine };
+  }
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
+    const useMT = hasSharedArrayBuffer();
+    const base = useMT ? "/ffmpeg" : "/ffmpeg/st";
+
     const ff = new FFmpeg();
+    // toBlobURL is needed even for same-origin files because ffmpeg's worker
+    // uses importScripts, which has COEP quirks with direct URLs.
     const coreURL = await toBlobURL(
-      `${CORE_BASE}/ffmpeg-core.js`,
+      `${base}/ffmpeg-core.js`,
       "text/javascript"
     );
     const wasmURL = await toBlobURL(
-      `${CORE_BASE}/ffmpeg-core.wasm`,
+      `${base}/ffmpeg-core.wasm`,
       "application/wasm"
     );
-    await ff.load({ coreURL, wasmURL });
+    const config = { coreURL, wasmURL };
+    if (useMT) {
+      config.workerURL = await toBlobURL(
+        `${base}/ffmpeg-core.worker.js`,
+        "text/javascript"
+      );
+    }
+
+    await ff.load(config);
     ffmpegInstance = ff;
-    return ff;
+    loadedEngine = useMT ? "ffmpeg-mt" : "ffmpeg-st";
+    return { ff, engine: loadedEngine };
   })();
 
   try {
@@ -72,8 +93,9 @@ async function loadFFmpeg(onProgress?: (msg: string) => void): Promise<FFmpeg> {
   } catch (e) {
     loadPromise = null;
     ffmpegInstance = null;
+    loadedEngine = null;
     throw new Error(
-      `Could not load the compression engine. ${e instanceof Error ? e.message : ""}`
+      `Could not load compression engine. ${e instanceof Error ? e.message : ""}`
     );
   }
 }
@@ -81,8 +103,10 @@ async function loadFFmpeg(onProgress?: (msg: string) => void): Promise<FFmpeg> {
 function qualityToCrf(quality: number, format: VideoTargetFormat): number {
   const q = Math.max(1, Math.min(100, quality));
   if (format === "video/mp4") {
+    // x264 CRF: 18 (excellent) → 40 (very small)
     return Math.round(40 - ((q - 1) / 99) * (40 - 18));
   }
+  // VP8 CRF: 10 (excellent) → 40 (very small)
   return Math.round(40 - ((q - 1) / 99) * (40 - 10));
 }
 
@@ -92,20 +116,23 @@ async function compressWithFFmpeg(
   srcInfo: { width: number; height: number; duration: number }
 ): Promise<CompressedVideo> {
   opts.onStatus?.("loading-engine");
-  const ff = await loadFFmpeg();
+  const { ff, engine } = await loadFFmpeg();
 
   opts.onStatus?.("compressing");
 
+  // Write input file
   const inExt = file.name.match(/\.[^.]+$/)?.[0] || ".mp4";
   const inputName = `input${inExt}`;
   const isMp4 = opts.format === "video/mp4";
   const outputName = `output.${isMp4 ? "mp4" : "webm"}`;
 
-  await ff.writeFile(inputName, await fetchFile(file));
+  const fileData = new Uint8Array(await file.arrayBuffer());
+  await ff.writeFile(inputName, fileData);
 
   const crf = qualityToCrf(opts.quality, opts.format);
   const args: string[] = ["-i", inputName];
 
+  // Scale filter (keep aspect ratio, ensure even dimensions)
   if (opts.targetHeight > 0) {
     const scale = Math.min(
       1,
@@ -121,6 +148,7 @@ async function compressWithFFmpeg(
       "-preset", "ultrafast",
       "-crf", String(crf),
       "-pix_fmt", "yuv420p",
+      // Copy audio when possible (avoids re-encoding = faster)
       "-c:a", "aac",
       "-b:a", "128k"
     );
@@ -138,11 +166,13 @@ async function compressWithFFmpeg(
 
   args.push(outputName);
 
+  // Progress tracking
   const progressHandler = ({ progress }: { progress: number }) => {
     opts.onProgress?.(Math.min(1, Math.max(0, progress)));
   };
   ff.on("progress", progressHandler);
 
+  // Abort support
   let aborted = false;
   const abortHandler = () => {
     aborted = true;
@@ -153,6 +183,7 @@ async function compressWithFFmpeg(
     }
     ffmpegInstance = null;
     loadPromise = null;
+    loadedEngine = null;
   };
   if (opts.signal) {
     if (opts.signal.aborted) {
@@ -176,14 +207,13 @@ async function compressWithFFmpeg(
   const data = await ff.readFile(outputName);
   const mimeType = isMp4 ? "video/mp4" : "video/webm";
 
-  // Critical: check for empty output (ffmpeg failed silently)
   if (!data || (data as Uint8Array).length === 0) {
     throw new Error("Compression produced no output. Try a different format or quality.");
   }
 
   const blob = new Blob([data as BlobPart], { type: mimeType });
 
-  // Cleanup FS
+  // Cleanup FS to free memory
   try {
     await ff.deleteFile(inputName);
     await ff.deleteFile(outputName);
@@ -209,7 +239,7 @@ async function compressWithFFmpeg(
     height: outH,
     duration: srcInfo.duration,
     mimeType,
-    engine: "ffmpeg",
+    engine,
   };
 }
 

@@ -205,7 +205,7 @@ export function VideoCompressor({ file, onClear }: Props) {
       }
       meta={
         showResult
-          ? `${res!.width}×${res!.height}${res!.engine === "ffmpeg" ? "" : " · slow"}`
+          ? `${res!.width}×${res!.height}${res!.engine === "mediarecorder" ? " · slow" : ""}`
           : src
             ? `${src.width}×${src.height}`
             : undefined
