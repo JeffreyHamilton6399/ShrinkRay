@@ -19,9 +19,12 @@ import {
 } from "@/components/ui/select";
 
 const FORMAT_LABELS: Record<ModelOutputFormat, string> = {
-  glb: "GLB (binary, smallest)",
+  glb: "GLB (binary, best for web)",
   gltf: "GLTF (text, editable)",
-  "draco-glb": "GLB (same as GLB here)",
+  fbx: "FBX → GLB (FBX export not available)",
+  obj: "OBJ (Wavefront)",
+  stl: "STL (3D printing)",
+  ply: "PLY (polygon)",
   gzip: "Gzip (.gz, universal)",
 };
 

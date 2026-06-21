@@ -119,6 +119,19 @@ export async function compressAudio(
   if (flush.length > 0) data.push(new Uint8Array(flush));
 
   const blob = new Blob(data as BlobPart[], { type: "audio/mpeg" });
+
+  // Never return a larger file — happens when re-encoding already-low-bitrate MP3
+  if (blob.size >= file.size) {
+    return {
+      blob: file,
+      url: URL.createObjectURL(file),
+      duration: audioBuffer.duration,
+      sampleRate,
+      channels: rightInt ? 2 : 1,
+      bitrateKbps: opts.bitrateKbps,
+    };
+  }
+
   return {
     blob,
     url: URL.createObjectURL(blob),

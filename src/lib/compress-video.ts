@@ -308,6 +308,19 @@ async function compressWithFFmpeg(
     outH = Math.round((srcInfo.height * scale) / 2) * 2;
   }
 
+  // Never return a larger file — happens with tiny videos or already-compressed sources
+  if (blob.size >= file.size) {
+    return {
+      blob: file,
+      url: URL.createObjectURL(file),
+      width: srcInfo.width,
+      height: srcInfo.height,
+      duration: srcInfo.duration,
+      mimeType: file.type || mimeType,
+      engine,
+    };
+  }
+
   return {
     blob,
     url: URL.createObjectURL(blob),
@@ -432,6 +445,19 @@ async function compressWithMediaRecorder(
 
     if (blob.size === 0) {
       throw new Error("Compression produced no output.");
+    }
+
+    // Never return a larger file
+    if (blob.size >= file.size) {
+      return {
+        blob: file,
+        url: URL.createObjectURL(file),
+        width: srcInfo.width,
+        height: srcInfo.height,
+        duration: srcInfo.duration,
+        mimeType: file.type || mimeType,
+        engine: "mediarecorder",
+      };
     }
 
     return {

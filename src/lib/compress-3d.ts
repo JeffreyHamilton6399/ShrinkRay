@@ -12,7 +12,14 @@
 
 import { gzip } from "fflate";
 
-export type ModelOutputFormat = "glb" | "gltf" | "draco-glb" | "gzip";
+export type ModelOutputFormat =
+  | "glb"
+  | "gltf"
+  | "fbx"
+  | "obj"
+  | "stl"
+  | "ply"
+  | "gzip";
 
 export interface CompressModelOptions {
   format: ModelOutputFormat;
@@ -36,10 +43,10 @@ export function getAvailableFormats(fileName: string): ModelOutputFormat[] {
   const ext = fileName.match(/\.([^.]+)$/i)?.[1].toLowerCase();
   // GLB/GLTF can convert to all formats
   if (ext === "glb" || ext === "gltf") {
-    return ["glb", "gltf", "draco-glb", "gzip"];
+    return ["glb", "gltf", "fbx", "obj", "stl", "ply", "gzip"];
   }
-  // Other formats (STL, OBJ, etc.) can convert to GLB-based formats
-  return ["glb", "draco-glb", "gzip"];
+  // Other formats (STL, OBJ, etc.) can convert to all formats too
+  return ["glb", "gltf", "fbx", "obj", "stl", "ply", "gzip"];
 }
 
 export async function compress3DModel(
@@ -283,31 +290,99 @@ async function convertWithThree(
     return gzipFile(file, `${base}.${ext}.gz`);
   }
 
-  // Export to GLB or GLTF
-  const exporter = new GLTFExporter();
-  const exportOptions = {
-    binary: format === "glb" || format === "draco-glb",
-    // Draco would need DRACOExporter — simplified for now
-  };
+  // Export to the requested format
+  // GLB/GLTF output via GLTFExporter
+  if (format === "glb" || format === "gltf") {
+    const exporter = new GLTFExporter();
+    const result = await new Promise<ArrayBuffer | string>((resolve, reject) => {
+      exporter.parse(
+        scene,
+        (gltf) => resolve(gltf as ArrayBuffer | string),
+        (err) => reject(err),
+        { binary: format === "glb" }
+      );
+    });
+    const isBinary = result instanceof ArrayBuffer;
+    const blob = new Blob([result as BlobPart], {
+      type: isBinary ? "model/gltf-binary" : "model/gltf+json",
+    });
+    return {
+      blob,
+      url: URL.createObjectURL(blob),
+      size: blob.size,
+      filename: isBinary ? `${base}.glb` : `${base}.gltf`,
+    };
+  }
 
-  const result = await new Promise<ArrayBuffer | string>((resolve, reject) => {
-    exporter.parse(
-      scene,
-      (gltf) => resolve(gltf as ArrayBuffer | string),
-      (err) => reject(err),
-      exportOptions
-    );
-  });
+  // STL output via STLExporter
+  if (format === "stl") {
+    const { STLExporter } = await import("three/examples/jsm/exporters/STLExporter.js");
+    const exporter = new STLExporter();
+    const stlString = exporter.parse(scene as THREE.Scene, { binary: true });
+    const blob = new Blob([stlString as BlobPart], { type: "model/stl" });
+    return {
+      blob,
+      url: URL.createObjectURL(blob),
+      size: blob.size,
+      filename: `${base}.stl`,
+    };
+  }
 
-  const isBinary = result instanceof ArrayBuffer;
-  const blob = new Blob([result as BlobPart], {
-    type: isBinary ? "model/gltf-binary" : "model/gltf+json",
-  });
+  // OBJ output via OBJExporter
+  if (format === "obj") {
+    const { OBJExporter } = await import("three/examples/jsm/exporters/OBJExporter.js");
+    const exporter = new OBJExporter();
+    const objString = exporter.parse(scene);
+    const blob = new Blob([objString], { type: "text/plain" });
+    return {
+      blob,
+      url: URL.createObjectURL(blob),
+      size: blob.size,
+      filename: `${base}.obj`,
+    };
+  }
 
-  return {
-    blob,
-    url: URL.createObjectURL(blob),
-    size: blob.size,
-    filename: isBinary ? `${base}.glb` : `${base}.gltf`,
-  };
+  // PLY output via PLYExporter
+  if (format === "ply") {
+    const { PLYExporter } = await import("three/examples/jsm/exporters/PLYExporter.js");
+    const exporter = new PLYExporter();
+    const plyBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+      exporter.parse(
+        scene,
+        (result) => resolve(result as ArrayBuffer),
+        (err) => reject(err),
+        { binary: true }
+      );
+    });
+    const blob = new Blob([plyBuffer as BlobPart], { type: "model/ply" });
+    return {
+      blob,
+      url: URL.createObjectURL(blob),
+      size: blob.size,
+      filename: `${base}.ply`,
+    };
+  }
+
+  // FBX output — Three.js doesn't have a built-in FBX exporter, use GLB as fallback
+  if (format === "fbx") {
+    const exporter = new GLTFExporter();
+    const result = await new Promise<ArrayBuffer | string>((resolve, reject) => {
+      exporter.parse(
+        scene,
+        (gltf) => resolve(gltf as ArrayBuffer | string),
+        (err) => reject(err),
+        { binary: true }
+      );
+    });
+    const blob = new Blob([result as BlobPart], { type: "model/gltf-binary" });
+    return {
+      blob,
+      url: URL.createObjectURL(blob),
+      size: blob.size,
+      filename: `${base}.glb`, // FBX export not supported, fall back to GLB
+    };
+  }
+
+  // Fallback: gzip
+  return gzipFile(file, `${base}.gz`);
 }

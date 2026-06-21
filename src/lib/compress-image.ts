@@ -151,6 +151,17 @@ export async function compressImage(
     });
   }
 
+  // Never return a larger file — if compression made it bigger, return original
+  // (happens with tiny images, or PNG→JPEG conversion adding background fill)
+  if (blob.size >= file.size) {
+    return {
+      blob: file,
+      url: URL.createObjectURL(file),
+      width: srcW,
+      height: srcH,
+    };
+  }
+
   return {
     blob,
     url: URL.createObjectURL(blob),

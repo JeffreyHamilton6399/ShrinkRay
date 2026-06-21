@@ -141,6 +141,16 @@ export async function compressPdf(
   }
 
   const blob = new Blob([outBytes as BlobPart], { type: "application/pdf" });
+
+  // Never return a larger file — happens with tiny PDFs or already-compressed scans
+  if (blob.size >= file.size) {
+    return {
+      blob: file,
+      url: URL.createObjectURL(file),
+      pages: total,
+    };
+  }
+
   return {
     blob,
     url: URL.createObjectURL(blob),
