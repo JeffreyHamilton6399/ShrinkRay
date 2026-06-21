@@ -148,9 +148,8 @@ async function compressWithFFmpeg(
       "-preset", "ultrafast",
       "-crf", String(crf),
       "-pix_fmt", "yuv420p",
-      // Copy audio when possible (avoids re-encoding = faster)
-      "-c:a", "aac",
-      "-b:a", "128k"
+      // Copy audio when possible (avoids re-encoding = much faster)
+      "-c:a", "copy"
     );
   } else {
     args.push(

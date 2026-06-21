@@ -55,16 +55,16 @@ export function VideoCompressor({ file, onClear }: Props) {
   const [src, setSrc] = React.useState<SrcInfo | null>(null);
   const [res, setRes] = React.useState<ResInfo | null>(null);
   const [status, setStatus] = React.useState<
-    "idle" | "processing" | "done" | "error"
-  >("idle");
+    "processing" | "done" | "error"
+  >("processing");
   const [progress, setProgress] = React.useState(0);
   const [enginePhase, setEnginePhase] = React.useState<
     "loading-engine" | "compressing" | null
   >(null);
   const [error, setError] = React.useState<string | null>(null);
   const [quality, setQuality] = React.useState(50);
-  const [targetHeight, setTargetHeight] = React.useState(720);
-  const [format, setFormat] = React.useState<VideoTargetFormat>("video/webm");
+  const [targetHeight, setTargetHeight] = React.useState(480);
+  const [format, setFormat] = React.useState<VideoTargetFormat>("video/mp4");
   const abortRef = React.useRef<AbortController | null>(null);
 
   // Load metadata on mount.
@@ -147,17 +147,14 @@ export function VideoCompressor({ file, onClear }: Props) {
   }, [file, src, quality, targetHeight, format]);
 
   // Auto-start when metadata is ready.
-  // (Settings changes don't auto-run — user clicks Compress/Re-compress.)
+  // Settings changes are debounced — re-runs 500ms after user stops adjusting.
   React.useEffect(() => {
-    if (src) setStatus("idle");
-  }, [src]);
-
-  // If settings change after a result, mark as stale
-  React.useEffect(() => {
-    if (status === "done" || status === "error") {
-      setStatus("idle");
-    }
-  }, [quality, targetHeight, format]);
+    if (!src) return;
+    const t = setTimeout(() => {
+      start();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [src, quality, targetHeight, format]);
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -215,11 +212,11 @@ export function VideoCompressor({ file, onClear }: Props) {
             controls
             className="max-h-44 max-w-full rounded-md bg-black"
           />
-        ) : status === "idle" && src ? (
+        ) : status === "processing" && src ? (
           <video
             src={originalUrl}
             controls
-            className="max-h-44 max-w-full rounded-md bg-black"
+            className="max-h-44 max-w-full rounded-md bg-black opacity-60"
           />
         ) : null
       }

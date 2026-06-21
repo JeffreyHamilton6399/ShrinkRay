@@ -20,8 +20,8 @@ export function PdfCompressor({ file, onClear }: Props) {
   React.useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
   const [res, setRes] = React.useState<CompressedPdf | null>(null);
-  const [status, setStatus] = React.useState<"idle" | "processing" | "done" | "error">(
-    "idle"
+  const [status, setStatus] = React.useState<"processing" | "done" | "error">(
+    "processing"
   );
   const [progress, setProgress] = React.useState(0);
   const [pageInfo, setPageInfo] = React.useState({ page: 0, total: 0 });
@@ -64,12 +64,13 @@ export function PdfCompressor({ file, onClear }: Props) {
     }
   }, [file, quality]);
 
-  // If settings change after a result, mark as stale
+  // Auto-run on mount, debounced re-run on quality change (500ms).
   React.useEffect(() => {
-    if (status === "done" || status === "error") {
-      setStatus("idle");
-    }
-  }, [quality]);
+    const t = setTimeout(() => {
+      start();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [file, quality]);
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
 

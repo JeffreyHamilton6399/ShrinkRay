@@ -25,8 +25,8 @@ export function AudioCompressor({ file, onClear }: Props) {
   React.useEffect(() => () => URL.revokeObjectURL(url), [url]);
 
   const [res, setRes] = React.useState<CompressedAudio | null>(null);
-  const [status, setStatus] = React.useState<"idle" | "processing" | "done" | "error">(
-    "idle"
+  const [status, setStatus] = React.useState<"processing" | "done" | "error">(
+    "processing"
   );
   const [progress, setProgress] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
@@ -66,12 +66,13 @@ export function AudioCompressor({ file, onClear }: Props) {
     }
   }, [file, bitrate, channels]);
 
-  // If settings change after a result, mark as stale
+  // Auto-run on mount, debounced re-run on settings change (500ms).
   React.useEffect(() => {
-    if (status === "done" || status === "error") {
-      setStatus("idle");
-    }
-  }, [bitrate, channels]);
+    const t = setTimeout(() => {
+      start();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [file, bitrate, channels]);
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
 
