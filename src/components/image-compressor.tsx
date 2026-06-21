@@ -118,6 +118,11 @@ export function ImageCompressor({ file, onClear }: Props) {
       status={status}
       resultSize={result?.size}
       error={error ?? undefined}
+      progressLabel={
+        /\.heic$|\.heif$/i.test(file.name)
+          ? "Decoding HEIC…"
+          : "Compressing image…"
+      }
       preview={
         <img
           src={status === "done" && result ? result.resultUrl : originalUrl}

@@ -32,7 +32,28 @@ export function isSupportedImage(file: File): boolean {
   if (/^image\/svg\+xml$/i.test(file.type) || /\.svg$/i.test(file.name)) {
     return false;
   }
+  // HEIC/HEIF (iPhone photos) — supported via heic2any decoder
+  if (/^image\/heic$/i.test(file.type) || /\.(heic|heif)$/i.test(file.name)) {
+    return true;
+  }
   return /^image\/(png|jpeg|webp|gif|bmp|avif)$/i.test(file.type);
+}
+
+/** Check if a file is HEIC/HEIF (needs special decoding). */
+export function isHeic(file: File): boolean {
+  return /^image\/heic$/i.test(file.type) || /\.(heic|heif)$/i.test(file.name);
+}
+
+/** Decode HEIC → JPEG Blob using heic2any (lazy-loaded). */
+async function decodeHeic(file: File): Promise<Blob> {
+  const heic2any = (await import("heic2any")).default;
+  const result = await heic2any({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.9,
+  });
+  // heic2any returns Blob | Blob[]
+  return Array.isArray(result) ? result[0] : result;
 }
 
 function loadImage(file: File): Promise<HTMLImageElement> {
@@ -73,6 +94,19 @@ export async function compressImage(
   file: File,
   opts: CompressImageOptions
 ): Promise<CompressedImage> {
+  // HEIC files need special decoding first (heic2any → JPEG blob)
+  let workingFile: File = file;
+  if (isHeic(file)) {
+    try {
+      const jpegBlob = await decodeHeic(file);
+      workingFile = new File([jpegBlob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+        type: "image/jpeg",
+      });
+    } catch {
+      throw new Error("Could not decode HEIC image. It may be corrupted.");
+    }
+  }
+
   // createImageBitmap decodes off the main thread — much faster than <Image>.
   let bitmap: ImageBitmap | HTMLImageElement;
   let srcW: number, srcH: number;
@@ -80,12 +114,12 @@ export async function compressImage(
 
   if (typeof createImageBitmap === "function") {
     try {
-      bitmap = await createImageBitmap(file);
+      bitmap = await createImageBitmap(workingFile);
       srcW = bitmap.width;
       srcH = bitmap.height;
     } catch {
       // Fallback for Safari/older browsers
-      bitmap = await loadImage(file);
+      bitmap = await loadImage(workingFile);
       srcW = (bitmap as HTMLImageElement).naturalWidth;
       srcH = (bitmap as HTMLImageElement).naturalHeight;
       if ((bitmap as HTMLImageElement).src.startsWith("blob:")) {
@@ -93,7 +127,7 @@ export async function compressImage(
       }
     }
   } else {
-    bitmap = await loadImage(file);
+    bitmap = await loadImage(workingFile);
     srcW = (bitmap as HTMLImageElement).naturalWidth;
     srcH = (bitmap as HTMLImageElement).naturalHeight;
     if ((bitmap as HTMLImageElement).src.startsWith("blob:")) {
