@@ -88,7 +88,9 @@ export async function compressAudio(
     opts.bitrateKbps
   );
 
-  const blockSize = 1152;
+  // Larger block size = fewer encodeBuffer calls = less overhead.
+  // 1152 is the MPEG frame size; multiples of it are most efficient.
+  const blockSize = 1152 * 8; // 8 frames per call (was 1)
   const data: Uint8Array[] = [];
   const total = leftInt.length;
 

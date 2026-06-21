@@ -95,6 +95,15 @@ async function loadFFmpeg(): Promise<{ ff: FFmpeg; engine: "ffmpeg-mt" | "ffmpeg
   }
 }
 
+/** Pre-warm the ffmpeg engine so it's ready when the user uploads a video. */
+export function preloadFFmpeg(): void {
+  if (typeof window === "undefined") return;
+  // Kick off the load in the background — don't await.
+  loadFFmpeg().catch(() => {
+    /* ignore — will retry on actual use */
+  });
+}
+
 function qualityToCrf(quality: number, format: VideoTargetFormat): number {
   const q = Math.max(1, Math.min(100, quality));
   if (format === "video/mp4") {

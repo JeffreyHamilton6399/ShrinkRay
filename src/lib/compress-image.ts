@@ -68,13 +68,35 @@ export async function compressImage(
   file: File,
   opts: CompressImageOptions
 ): Promise<CompressedImage> {
-  const img = await loadImage(file);
-  const { w, h } = computeDimensions(
-    img.naturalWidth || img.width,
-    img.naturalHeight || img.height,
-    opts.maxWidth,
-    opts.maxHeight
-  );
+  // createImageBitmap decodes off the main thread — much faster than <Image>.
+  let bitmap: ImageBitmap | HTMLImageElement;
+  let srcW: number, srcH: number;
+  let revokeUrl: string | null = null;
+
+  if (typeof createImageBitmap === "function") {
+    try {
+      bitmap = await createImageBitmap(file);
+      srcW = bitmap.width;
+      srcH = bitmap.height;
+    } catch {
+      // Fallback for Safari/older browsers
+      bitmap = await loadImage(file);
+      srcW = (bitmap as HTMLImageElement).naturalWidth;
+      srcH = (bitmap as HTMLImageElement).naturalHeight;
+      if ((bitmap as HTMLImageElement).src.startsWith("blob:")) {
+        revokeUrl = (bitmap as HTMLImageElement).src;
+      }
+    }
+  } else {
+    bitmap = await loadImage(file);
+    srcW = (bitmap as HTMLImageElement).naturalWidth;
+    srcH = (bitmap as HTMLImageElement).naturalHeight;
+    if ((bitmap as HTMLImageElement).src.startsWith("blob:")) {
+      revokeUrl = (bitmap as HTMLImageElement).src;
+    }
+  }
+
+  const { w, h } = computeDimensions(srcW, srcH, opts.maxWidth, opts.maxHeight);
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -88,9 +110,16 @@ export async function compressImage(
     ctx.fillRect(0, 0, w, h);
   }
 
+  // Disable expensive smoothing for speed — the scale is usually down anyway.
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(img, 0, 0, w, h);
+  ctx.imageSmoothingQuality = "medium"; // "high" is slower, negligible diff
+  ctx.drawImage(bitmap as CanvasImageSource, 0, 0, w, h);
+
+  // Free the bitmap/Image immediately
+  if ("close" in bitmap && typeof (bitmap as ImageBitmap).close === "function") {
+    (bitmap as ImageBitmap).close();
+  }
+  if (revokeUrl) URL.revokeObjectURL(revokeUrl);
 
   const blob: Blob = await new Promise((resolve, reject) => {
     canvas.toBlob(
@@ -99,9 +128,6 @@ export async function compressImage(
       opts.format === "image/png" ? undefined : opts.quality
     );
   });
-
-  // Revoke the source object URL to free memory
-  if (img.src.startsWith("blob:")) URL.revokeObjectURL(img.src);
 
   return {
     blob,

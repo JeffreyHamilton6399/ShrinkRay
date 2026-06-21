@@ -82,6 +82,11 @@ export async function compressPdf(
   const jpegQuality = qualityToJpeg(opts.quality);
   const baseScale = qualityToScale(opts.quality);
 
+  // Reuse a single canvas across all pages (avoids per-page allocation).
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas 2D context unavailable");
+
   for (let i = 1; i <= total; i++) {
     if (opts.signal?.aborted) {
       throw new DOMException("Aborted", "AbortError");
@@ -96,11 +101,9 @@ export async function compressPdf(
     const scale = baseScale * capScale;
 
     const viewport = page.getViewport({ scale });
-    const canvas = document.createElement("canvas");
+    // Resize the reused canvas (only re-allocates if dimensions changed).
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas 2D context unavailable");
 
     // White background (so transparent PDF areas don't go black in JPEG).
     ctx.fillStyle = "#ffffff";

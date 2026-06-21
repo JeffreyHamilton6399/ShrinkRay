@@ -7,10 +7,17 @@ import { Compressor } from "@/components/compressor";
 import { SettingsMenu } from "@/components/settings-menu";
 import { TermsGate } from "@/components/terms-gate";
 import { LogoMark } from "@/components/logo-mark";
+import { preloadFFmpeg } from "@/lib/compress-video";
 
 const DONATE_URL = "https://buymeacoffee.com/jeffreyscof";
 
 export default function Home() {
+  // Pre-warm the ffmpeg engine in the background as soon as the page loads,
+  // so it's ready by the time the user drops a video (saves ~3-4 seconds).
+  React.useEffect(() => {
+    preloadFFmpeg();
+  }, []);
+
   return (
     <TermsGate>
       <div className="flex h-dvh flex-col overflow-hidden bg-background">
