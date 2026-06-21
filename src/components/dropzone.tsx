@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import {
-  UploadCloud,
   ImageIcon,
   Film,
   Music,
@@ -95,9 +94,9 @@ export function Dropzone({
         }
       }}
       className={cn(
-        "group relative flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-7 text-center transition-all duration-200",
+        "group relative flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-6 py-6 text-center transition-all",
         "hover:border-foreground/40 hover:bg-muted/50",
-        dragging && "border-foreground/60 bg-muted scale-[1.005]",
+        dragging && "border-foreground/60 bg-muted",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className
       )}
@@ -113,11 +112,10 @@ export function Dropzone({
           e.target.value = "";
         }}
       />
-      <Icon className="mb-2 h-7 w-7 text-muted-foreground transition-colors group-hover:text-foreground" />
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-      <p className="mt-1 max-w-sm text-xs text-muted-foreground">{subtitle}</p>
-      <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/70">
-        <UploadCloud className="h-3 w-3" />
+      <Icon className="mb-1.5 h-6 w-6 text-muted-foreground transition-colors group-hover:text-foreground" />
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="mt-0.5 max-w-sm text-xs text-muted-foreground">{subtitle}</p>
+      <p className="mt-1.5 text-[11px] text-muted-foreground/60">
         or paste from clipboard
       </p>
     </div>

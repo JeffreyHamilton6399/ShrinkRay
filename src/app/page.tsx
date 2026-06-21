@@ -22,17 +22,17 @@ export default function Home() {
     <TermsGate>
       <div className="flex h-dvh flex-col overflow-hidden bg-background">
         {/* Header */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b px-4">
-          <a href="/" className="flex items-center gap-2">
-            <LogoMark className="h-6 w-6 text-foreground" />
-            <span className="text-sm font-bold tracking-tight">ShrinkRay</span>
+        <header className="flex h-12 shrink-0 items-center justify-between border-b px-3">
+          <a href="/" className="flex items-center gap-1.5">
+            <LogoMark className="h-5 w-5 text-foreground" />
+            <span className="text-sm font-semibold tracking-tight">ShrinkRay</span>
           </a>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               asChild
               variant="outline"
               size="sm"
-              className="h-8 rounded-full border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
+              className="h-7 rounded-full border-rose-200 px-2.5 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10"
             >
               <a
                 href={DONATE_URL}
@@ -40,8 +40,8 @@ export default function Home() {
                 rel="noreferrer"
                 aria-label="Buy me a coffee"
               >
-                <Heart className="h-4 w-4" />
-                <span className="ml-1.5 hidden sm:inline">Donate</span>
+                <Heart className="h-3.5 w-3.5" />
+                <span className="ml-1 hidden sm:inline">Donate</span>
               </a>
             </Button>
             <SettingsMenu />
@@ -49,12 +49,12 @@ export default function Home() {
         </header>
 
         {/* Main — fills remaining height, never scrolls */}
-        <main className="flex min-h-0 flex-1 flex-col px-4 py-3">
+        <main className="flex min-h-0 flex-1 flex-col px-3 py-2">
           <Compressor />
         </main>
 
         {/* Footer */}
-        <footer className="flex h-9 shrink-0 items-center justify-center border-t px-4 text-xs text-muted-foreground">
+        <footer className="flex h-8 shrink-0 items-center justify-center border-t px-4 text-[11px] text-muted-foreground">
           V1 · Jeffrey Hamilton
         </footer>
       </div>

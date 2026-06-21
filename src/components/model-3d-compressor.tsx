@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Box, Info, Loader2 } from "lucide-react";
+import { Box, Info } from "lucide-react";
 import { ResultCard } from "@/components/result-card";
 import {
   compress3DModel,
@@ -103,12 +103,8 @@ export function Model3DCompressor({ file, onClear }: Props) {
       error={error ?? undefined}
       progressLabel="Converting 3D model…"
       preview={
-        <div className="flex flex-col items-center gap-2 py-2 text-muted-foreground">
-          {status === "processing" ? (
-            <Loader2 className="h-12 w-12 animate-spin text-emerald-500" />
-          ) : (
-            <Box className="h-12 w-12 text-emerald-500" />
-          )}
+        <div className="flex flex-col items-center gap-1 py-1 text-muted-foreground">
+          <Box className="h-10 w-10 text-emerald-500" />
           <p className="text-xs">→ {res?.filename ?? "converting…"}</p>
         </div>
       }
