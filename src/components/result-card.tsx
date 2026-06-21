@@ -7,6 +7,7 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { formatBytes, savedPercent, shortFileName } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-export type CompressStatus = "processing" | "done" | "error";
+export type CompressStatus = "idle" | "processing" | "done" | "error";
 
 interface ResultCardProps {
   fileName: string;
@@ -55,7 +56,6 @@ export function ResultCard({
   const grew = hasResult ? resultSize! > originalSize : false;
 
   // Defensive: if status is "done" but we have no result, show an error
-  // instead of a broken card with "…" and a disabled download button.
   const effectiveStatus =
     status === "done" && !hasResult ? "error" : status;
   const effectiveError =
@@ -88,7 +88,11 @@ export function ResultCard({
           <div className="flex flex-1 flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+                {effectiveStatus === "done" ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
+                ) : (
+                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                )}
                 <span
                   className="truncate text-sm font-medium"
                   title={fileName}
@@ -118,18 +122,26 @@ export function ResultCard({
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-baseline gap-2 text-sm tabular-nums">
-                <span className="text-muted-foreground line-through">
-                  {formatBytes(originalSize)}
-                </span>
-                <span className="text-muted-foreground">→</span>
-                <span
-                  className={cn(
-                    "font-semibold",
-                    grew ? "text-amber-600" : "text-emerald-600"
-                  )}
-                >
-                  {hasResult ? formatBytes(resultSize!) : "…"}
-                </span>
+                {hasResult ? (
+                  <>
+                    <span className="text-muted-foreground line-through">
+                      {formatBytes(originalSize)}
+                    </span>
+                    <span className="text-muted-foreground">→</span>
+                    <span
+                      className={cn(
+                        "font-semibold",
+                        grew ? "text-amber-600" : "text-emerald-600"
+                      )}
+                    >
+                      {formatBytes(resultSize!)}
+                    </span>
+                  </>
+                ) : (
+                  <span className="font-semibold text-muted-foreground">
+                    {formatBytes(originalSize)}
+                  </span>
+                )}
                 {meta && (
                   <span className="text-xs text-muted-foreground">· {meta}</span>
                 )}

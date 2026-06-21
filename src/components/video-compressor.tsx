@@ -49,11 +49,14 @@ const PRESETS = [
 ];
 
 export function VideoCompressor({ file, onClear }: Props) {
+  const originalUrl = React.useMemo(() => URL.createObjectURL(file), [file]);
+  React.useEffect(() => () => URL.revokeObjectURL(originalUrl), [originalUrl]);
+
   const [src, setSrc] = React.useState<SrcInfo | null>(null);
   const [res, setRes] = React.useState<ResInfo | null>(null);
   const [status, setStatus] = React.useState<
-    "processing" | "done" | "error"
-  >("processing");
+    "idle" | "processing" | "done" | "error"
+  >("idle");
   const [progress, setProgress] = React.useState(0);
   const [enginePhase, setEnginePhase] = React.useState<
     "loading-engine" | "compressing" | null
@@ -143,10 +146,18 @@ export function VideoCompressor({ file, onClear }: Props) {
     }
   }, [file, src, quality, targetHeight, format]);
 
-  // Auto-start when metadata is ready or settings change.
+  // Auto-start when metadata is ready.
+  // (Settings changes don't auto-run — user clicks Compress/Re-compress.)
   React.useEffect(() => {
-    start();
-  }, [start]);
+    if (src) setStatus("idle");
+  }, [src]);
+
+  // If settings change after a result, mark as stale
+  React.useEffect(() => {
+    if (status === "done" || status === "error") {
+      setStatus("idle");
+    }
+  }, [quality, targetHeight, format]);
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -201,6 +212,12 @@ export function VideoCompressor({ file, onClear }: Props) {
         showResult ? (
           <video
             src={res!.url}
+            controls
+            className="max-h-44 max-w-full rounded-md bg-black"
+          />
+        ) : status === "idle" && src ? (
+          <video
+            src={originalUrl}
             controls
             className="max-h-44 max-w-full rounded-md bg-black"
           />
