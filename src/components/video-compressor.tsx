@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import { ResultCard } from "@/components/result-card";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -13,13 +13,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Square } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   compressVideo,
-  estimateBitrate,
   type VideoTargetFormat,
+  type CompressedVideo,
 } from "@/lib/compress-video";
-
-type Preset = "orig" | "1080" | "720" | "480" | "360";
 
 interface SrcInfo {
   width: number;
@@ -33,6 +32,7 @@ interface ResInfo {
   size: number;
   width: number;
   height: number;
+  engine: string;
 }
 
 interface Props {
@@ -40,15 +40,27 @@ interface Props {
   onClear: () => void;
 }
 
+const PRESETS = [
+  { value: "0", label: "Original" },
+  { value: "1080", label: "1080p" },
+  { value: "720", label: "720p" },
+  { value: "480", label: "480p" },
+  { value: "360", label: "360p" },
+];
+
 export function VideoCompressor({ file, onClear }: Props) {
   const [src, setSrc] = React.useState<SrcInfo | null>(null);
   const [res, setRes] = React.useState<ResInfo | null>(null);
-  const [status, setStatus] = React.useState<"processing" | "done" | "error">(
-    "processing"
-  );
+  const [status, setStatus] = React.useState<
+    "processing" | "done" | "error"
+  >("processing");
   const [progress, setProgress] = React.useState(0);
+  const [enginePhase, setEnginePhase] = React.useState<
+    "loading-engine" | "compressing" | null
+  >(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [preset, setPreset] = React.useState<Preset>("720");
+  const [quality, setQuality] = React.useState(50);
+  const [targetHeight, setTargetHeight] = React.useState(720);
   const [format, setFormat] = React.useState<VideoTargetFormat>("video/webm");
   const abortRef = React.useRef<AbortController | null>(null);
 
@@ -79,26 +91,8 @@ export function VideoCompressor({ file, onClear }: Props) {
     };
   }, [file]);
 
-  const plan = React.useMemo(() => {
-    if (!src) return null;
-    const longSide = Math.max(src.width, src.height);
-    const target: Record<Preset, number> = {
-      orig: longSide,
-      "1080": 1920,
-      "720": 1280,
-      "480": 854,
-      "360": 640,
-    };
-    const ts = target[preset];
-    const scale = Math.min(1, ts / longSide);
-    const outW = Math.round((src.width * scale) / 2) * 2;
-    const outH = Math.round((src.height * scale) / 2) * 2;
-    const bitrate = estimateBitrate(outW, outH);
-    return { outW, outH, scale, bitrate };
-  }, [src, preset]);
-
   const start = React.useCallback(async () => {
-    if (!src || !plan) return;
+    if (!src) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -108,15 +102,23 @@ export function VideoCompressor({ file, onClear }: Props) {
     });
     setStatus("processing");
     setProgress(0);
+    setEnginePhase("loading-engine");
     setError(null);
     try {
-      const r = await compressVideo(file, {
-        targetBitrate: plan.bitrate,
-        scale: plan.scale,
-        format,
-        signal: controller.signal,
-        onProgress: (ratio) => setProgress(Math.round(ratio * 100)),
-      });
+      const r: CompressedVideo = await compressVideo(
+        file,
+        {
+          quality,
+          targetHeight,
+          format,
+          signal: controller.signal,
+          onProgress: (ratio) => {
+            setProgress(Math.round(ratio * 100));
+          },
+          onStatus: (s) => setEnginePhase(s),
+        },
+        src
+      );
       if (controller.signal.aborted) return;
       setRes({
         blob: r.blob,
@@ -124,18 +126,22 @@ export function VideoCompressor({ file, onClear }: Props) {
         size: r.blob.size,
         width: r.width,
         height: r.height,
+        engine: r.engine,
       });
       setStatus("done");
+      setEnginePhase(null);
       setProgress(100);
     } catch (e) {
       if (controller.signal.aborted) {
         setStatus("done");
+        setEnginePhase(null);
         return;
       }
       setError(e instanceof Error ? e.message : "Compression failed");
       setStatus("error");
+      setEnginePhase(null);
     }
-  }, [file, src, plan, format]);
+  }, [file, src, quality, targetHeight, format]);
 
   // Auto-start when metadata is ready or settings change.
   React.useEffect(() => {
@@ -147,6 +153,7 @@ export function VideoCompressor({ file, onClear }: Props) {
   const cancel = () => {
     abortRef.current?.abort();
     setStatus("done");
+    setEnginePhase(null);
     setProgress(0);
   };
 
@@ -169,7 +176,14 @@ export function VideoCompressor({ file, onClear }: Props) {
   };
 
   const showResult = status === "done" && res;
-  const previewUrl = showResult ? res!.url : null;
+
+  const progressLabel = !src
+    ? "Reading video…"
+    : enginePhase === "loading-engine"
+      ? "Loading compression engine…"
+      : enginePhase === "compressing"
+        ? `Compressing… ${progress}%`
+        : undefined;
 
   return (
     <ResultCard
@@ -179,17 +193,11 @@ export function VideoCompressor({ file, onClear }: Props) {
       resultSize={res?.size}
       error={error ?? undefined}
       progress={progress}
-      progressLabel={
-        !src
-          ? "Reading video…"
-          : status === "processing"
-            ? "Re-encoding in real time…"
-            : undefined
-      }
+      progressLabel={progressLabel}
       preview={
-        previewUrl ? (
+        showResult ? (
           <video
-            src={previewUrl}
+            src={res!.url}
             controls
             className="max-h-44 max-w-full rounded-md bg-black"
           />
@@ -197,7 +205,7 @@ export function VideoCompressor({ file, onClear }: Props) {
       }
       meta={
         showResult
-          ? `${res!.width}×${res!.height}`
+          ? `${res!.width}×${res!.height}${res!.engine === "ffmpeg" ? "" : " · slow"}`
           : src
             ? `${src.width}×${src.height}`
             : undefined
@@ -206,22 +214,39 @@ export function VideoCompressor({ file, onClear }: Props) {
       onClear={clear}
       controls={
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border bg-card p-3">
+          <div className="flex flex-1 items-center gap-3 min-w-[180px]">
+            <Label className="shrink-0 text-xs text-muted-foreground">
+              Quality
+            </Label>
+            <Slider
+              min={10}
+              max={100}
+              step={1}
+              value={[quality]}
+              onValueChange={(v) => setQuality(v[0])}
+              disabled={!src}
+              className="flex-1"
+            />
+            <Badge variant="secondary" className="shrink-0 tabular-nums">
+              {quality}
+            </Badge>
+          </div>
           <div className="flex items-center gap-2">
             <Label className="text-xs text-muted-foreground">Resolution</Label>
             <Select
-              value={preset}
-              onValueChange={(v) => setPreset(v as Preset)}
+              value={String(targetHeight)}
+              onValueChange={(v) => setTargetHeight(Number(v))}
               disabled={!src}
             >
               <SelectTrigger className="h-8 w-[90px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="orig">Original</SelectItem>
-                <SelectItem value="1080">1080p</SelectItem>
-                <SelectItem value="720">720p</SelectItem>
-                <SelectItem value="480">480p</SelectItem>
-                <SelectItem value="360">360p</SelectItem>
+                {PRESETS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -241,11 +266,6 @@ export function VideoCompressor({ file, onClear }: Props) {
               </SelectContent>
             </Select>
           </div>
-          {plan && (
-            <Badge variant="secondary" className="shrink-0 tabular-nums">
-              {(plan.bitrate / 1000).toFixed(0)} kbps
-            </Badge>
-          )}
           {status === "processing" && src && (
             <div className="ml-auto">
               <Button size="sm" variant="destructive" onClick={cancel}>
