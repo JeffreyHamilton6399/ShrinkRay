@@ -60,27 +60,30 @@ async function loadFFmpeg(): Promise<{ ff: FFmpeg; engine: "ffmpeg-mt" | "ffmpeg
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
-    // Try MT core first (2-4x faster, uses multiple CPU cores via Worker).
-    // Works on real browsers with COOP/COEP headers (Vercel production).
-    // Falls back to ST if MT hangs/fails (headless environments).
+    // Try MT core first (2-4x faster, uses multiple CPU cores).
+    // The v0.12 API uses classWorkerURL (the ffmpeg.wasm library worker),
+    // NOT workerURL (which is the old API / ffmpeg-core worker).
     if (hasSharedArrayBuffer()) {
       try {
         const ff = new FFmpeg();
+        // classWorkerURL = ffmpeg.wasm's own worker (NOT the core worker).
+        // Copied to /public/ffmpeg/ffmpeg-worker.js for same-origin loading.
+        const classWorkerURL = "/ffmpeg/ffmpeg-worker.js";
         const coreURL = await toBlobURL("/ffmpeg/ffmpeg-core.js", "text/javascript");
         const wasmURL = await toBlobURL("/ffmpeg/ffmpeg-core.wasm", "application/wasm");
-        const workerURL = await toBlobURL("/ffmpeg/ffmpeg-core.worker.js", "text/javascript");
 
         await Promise.race([
-          ff.load({ coreURL, wasmURL, workerURL }),
+          ff.load({ coreURL, wasmURL, classWorkerURL }),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("MT timeout")), 8_000)
+            setTimeout(() => reject(new Error("MT timeout")), 10_000)
           ),
         ]);
         ffmpegInstance = ff;
         loadedEngine = "ffmpeg-mt";
         return { ff, engine: "ffmpeg-mt" as const };
-      } catch {
-        // MT failed/timed out — fall through to ST
+      } catch (e) {
+        // MT failed — fall through to ST
+        void e;
       }
     }
 
