@@ -100,29 +100,28 @@ export function Compressor() {
     const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
     return (
       <div className="flex h-full flex-col gap-3">
-        <ToolBar
-          onBack={goBack}
-          onAdd={() => setShowDrop(true)}
-          onClear={() => removeFile(selected.id)}
-          showClear={false}
-        />
+        <div className="flex items-center">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={goBack}
+            className="text-muted-foreground"
+          >
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            Back to list
+          </Button>
+        </div>
         {renderCompressor(kind, file, key, () => removeFile(selected.id))}
       </div>
     );
   }
 
-  // --- Single file → full UI with controls ---
+  // --- Single file → full UI with controls (ResultCard has its own New button) ---
   if (files.length === 1) {
     const { file, kind } = files[0];
     const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
     return (
       <div className="flex h-full flex-col gap-3">
-        <ToolBar
-          onBack={clearAll}
-          onAdd={() => setShowDrop(true)}
-          onClear={clearAll}
-          backLabel="New"
-        />
         {renderCompressor(kind, file, key, clearAll)}
       </div>
     );
@@ -169,46 +168,6 @@ export function Compressor() {
             onClick={() => setSelectedId(item.id)}
           />
         ))}
-      </div>
-    </div>
-  );
-}
-
-// --- Persistent toolbar for single/selected file views ---
-function ToolBar({
-  onBack,
-  onAdd,
-  onClear,
-  backLabel = "Back",
-  showClear = true,
-}: {
-  onBack: () => void;
-  onAdd: () => void;
-  onClear: () => void;
-  backLabel?: string;
-  showClear?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={onBack}
-        className="text-muted-foreground"
-      >
-        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-        {backLabel}
-      </Button>
-      <div className="flex gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onAdd}
-          className="text-muted-foreground"
-        >
-          <Plus className="mr-1.5 h-3.5 w-3.5" />
-          Add more
-        </Button>
       </div>
     </div>
   );
