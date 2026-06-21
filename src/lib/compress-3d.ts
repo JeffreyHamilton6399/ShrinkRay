@@ -378,6 +378,6 @@ async function convertWithThree(
     };
   }
 
-  // Fallback: gzip
+  // Defensive fallback (shouldn't reach here — gzip handled earlier)
   return gzipFile(file, `${base}.gz`);
 }

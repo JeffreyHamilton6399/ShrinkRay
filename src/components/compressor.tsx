@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package, Image as ImageIcon, Film, Music, FileText, FileArchive, FileCode, Box } from "lucide-react";
 import { Dropzone } from "@/components/dropzone";
 import { ImageCompressor } from "@/components/image-compressor";
 import { VideoCompressor } from "@/components/video-compressor";
@@ -300,7 +300,7 @@ function FileRow({
       }}
       className="group flex cursor-pointer items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-base">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
         <KindIcon kind={item.kind} />
       </div>
       <div className="min-w-0 flex-1">
@@ -347,8 +347,18 @@ function FileRow({
 }
 
 function KindIcon({ kind }: { kind: MediaKind }) {
-  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", svg: "✏️", "3d": "📦", text: "📝", file: "📦" };
-  return <span>{icons[kind]}</span>;
+  const icons: Record<MediaKind, React.ComponentType<{ className?: string }>> = {
+    image: ImageIcon,
+    video: Film,
+    audio: Music,
+    pdf: FileText,
+    svg: FileCode,
+    "3d": Box,
+    text: FileCode,
+    file: FileArchive,
+  };
+  const Icon = icons[kind];
+  return <Icon className="h-4 w-4 text-muted-foreground" />;
 }
 
 function extFor(blob: Blob, fileName?: string): string {

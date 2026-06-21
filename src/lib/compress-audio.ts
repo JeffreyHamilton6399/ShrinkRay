@@ -78,8 +78,6 @@ export async function compressAudio(
   if (useChannels >= 2 && srcChannels >= 2) {
     const right = audioBuffer.getChannelData(1);
     rightInt = floatToInt16(right);
-  } else if (useChannels === 1 && srcChannels >= 2) {
-    // Already using left only → mono
   }
 
   const encoder = new lamejs.Mp3Encoder(

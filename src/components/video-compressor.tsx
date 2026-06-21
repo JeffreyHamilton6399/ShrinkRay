@@ -81,10 +81,9 @@ export function VideoCompressor({ file, onClear }: Props) {
   const [speedPreset, setSpeedPreset] = React.useState<SpeedPreset>("balanced");
   const abortRef = React.useRef<AbortController | null>(null);
 
-  // Load metadata on mount.
+  // Load metadata on mount — reuse originalUrl (already created above).
   React.useEffect(() => {
     let cancelled = false;
-    const url = URL.createObjectURL(file);
     const v = document.createElement("video");
     v.preload = "metadata";
     v.muted = true;
@@ -101,12 +100,11 @@ export function VideoCompressor({ file, onClear }: Props) {
       setError("Could not read this video");
       setStatus("error");
     };
-    v.src = url;
+    v.src = originalUrl;
     return () => {
       cancelled = true;
-      URL.revokeObjectURL(url);
     };
-  }, [file]);
+  }, [file, originalUrl]);
 
   const start = React.useCallback(async () => {
     if (!src) return;

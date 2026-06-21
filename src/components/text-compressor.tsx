@@ -73,6 +73,7 @@ export function TextCompressor({ file, onClear }: Props) {
       resultSize={res?.size}
       error={error ?? undefined}
       progressLabel="Minifying + compressing…"
+      meta={res ? "minified + gzipped" : undefined}
       preview={
         <div className="flex flex-col items-center gap-2 py-2 text-muted-foreground">
           <FileCode className="h-12 w-12 text-emerald-500" />
