@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   keywords: ["image compressor", "video compressor", "mp3 compressor", "pdf compressor", "free compressor", "browser", "privacy", "no upload"],
   authors: [{ name: "ShrinkRay" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.svg",
   },
   openGraph: {
     title: "ShrinkRay — Free Browser Media Compressor",

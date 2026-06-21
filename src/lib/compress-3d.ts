@@ -1,10 +1,10 @@
 /**
- * 3D model compression — GLB and GLTF files.
+ * 3D model compression — GLB, GLTF, STL, FBX, OBJ, PLY files.
  *
- * GLTF (.gltf) is JSON text → gzip works extremely well (60-80% reduction).
- * GLB (.glb) is binary → gzip still gives 30-50% reduction on most models.
- * Both are served as .glb.gz / .gltf.gz — browsers and 3D engines decompress
- * on the fly. Everything runs in the browser — nothing is uploaded.
+ * - Text-based formats (GLTF, STL-ascii, OBJ, PLY-ascii) compress 60-90%
+ * - Binary formats (GLB, STL-binary, FBX, PLY-binary) compress 30-60%
+ * All are gzipped — works with Three.js, Babylon.js, and most 3D engines.
+ * Everything runs in the browser — nothing is uploaded.
  */
 
 import { gzip } from "fflate";
@@ -16,8 +16,10 @@ export interface CompressedModel {
   filename: string;
 }
 
+const MODEL_EXTS = /\.(glb|gltf|stl|fbx|obj|ply|3ds|dae|blend)$/i;
+
 export function is3DModel(file: File): boolean {
-  return /\.(glb|gltf)$/i.test(file.name);
+  return MODEL_EXTS.test(file.name);
 }
 
 export async function compress3DModel(file: File): Promise<CompressedModel> {

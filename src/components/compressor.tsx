@@ -10,6 +10,7 @@ import { PdfCompressor } from "@/components/pdf-compressor";
 import { FileCompressor } from "@/components/file-compressor";
 import { SvgCompressor } from "@/components/svg-compressor";
 import { Model3DCompressor } from "@/components/model-3d-compressor";
+import { TextCompressor } from "@/components/text-compressor";
 import { detectKindAsync, type MediaKind } from "@/lib/detect";
 import { formatBytes, savedPercent, shortFileName } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -111,6 +112,7 @@ export function Compressor() {
         {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "svg" && <SvgCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "3d" && <Model3DCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "text" && <TextCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "file" && <FileCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
       </div>
     );
@@ -128,6 +130,7 @@ export function Compressor() {
         {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "svg" && <SvgCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "3d" && <Model3DCompressor key={key} file={file} onClear={clearAll} />}
+        {kind === "text" && <TextCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "file" && <FileCompressor key={key} file={file} onClear={clearAll} />}
       </div>
     );
@@ -328,7 +331,7 @@ function FileRow({
 }
 
 function KindIcon({ kind }: { kind: MediaKind }) {
-  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", svg: "✏️", "3d": "📦", file: "📦" };
+  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", svg: "✏️", "3d": "📦", text: "📝", file: "📦" };
   return <span>{icons[kind]}</span>;
 }
 
@@ -374,6 +377,11 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   if (kind === "3d") {
     const { compress3DModel } = await import("@/lib/compress-3d");
     const r = await compress3DModel(file);
+    return { blob: r.blob, url: r.url, size: r.size };
+  }
+  if (kind === "text") {
+    const { compressTextFile } = await import("@/lib/compress-text");
+    const r = await compressTextFile(file);
     return { blob: r.blob, url: r.url, size: r.size };
   }
   if (kind === "audio") {

@@ -5,6 +5,7 @@ import { isSupportedVideo, isAnimatedGif } from "./compress-video";
 import { isSupportedAudio } from "./compress-audio";
 import { isPdf } from "./compress-pdf";
 import { is3DModel } from "./compress-3d";
+import { isTextFile } from "./compress-text";
 
 export type MediaKind =
   | "image"
@@ -13,6 +14,7 @@ export type MediaKind =
   | "pdf"
   | "svg"
   | "3d"
+  | "text"
   | "file";
 
 /** Quick sync detection (doesn't distinguish animated GIFs). */
@@ -22,8 +24,8 @@ export function detectKind(file: File): MediaKind {
   if (is3DModel(file)) return "3d";
   if (isSupportedVideo(file)) return "video";
   if (isSupportedAudio(file)) return "audio";
-  // GIFs and other images — may be reclassified to "video" if animated
   if (isSupportedImage(file)) return "image";
+  if (isTextFile(file)) return "text";
   return "file";
 }
 
