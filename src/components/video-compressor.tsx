@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Square } from "lucide-react";
+import { Square, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   compressVideo,
@@ -119,7 +119,7 @@ export function VideoCompressor({ file, onClear }: Props) {
         },
         src
       );
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) return; // new run will handle state
       setRes({
         blob: r.blob,
         url: r.url,
@@ -132,12 +132,12 @@ export function VideoCompressor({ file, onClear }: Props) {
       setEnginePhase(null);
       setProgress(100);
     } catch (e) {
-      if (controller.signal.aborted) {
-        setStatus("done");
-        setEnginePhase(null);
-        return;
-      }
-      setError(e instanceof Error ? e.message : "Compression failed");
+      if (controller.signal.aborted) return; // new run will handle state
+      setError(
+        e instanceof Error
+          ? e.message
+          : "Compression failed. Try a lower resolution or shorter clip."
+      );
       setStatus("error");
       setEnginePhase(null);
     }
@@ -152,7 +152,8 @@ export function VideoCompressor({ file, onClear }: Props) {
 
   const cancel = () => {
     abortRef.current?.abort();
-    setStatus("done");
+    setError("Compression cancelled.");
+    setStatus("error");
     setEnginePhase(null);
     setProgress(0);
   };
@@ -176,6 +177,8 @@ export function VideoCompressor({ file, onClear }: Props) {
   };
 
   const showResult = status === "done" && res;
+
+  const isLargeFile = file.size > 50 * 1024 * 1024; // 50 MB
 
   const progressLabel = !src
     ? "Reading video…"
@@ -212,6 +215,18 @@ export function VideoCompressor({ file, onClear }: Props) {
       }
       onDownload={download}
       onClear={clear}
+      warning={
+        isLargeFile && status === "processing" ? (
+          <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+            <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Large file detected ({(file.size / 1024 / 1024).toFixed(0)} MB).
+              Browser-based compression has memory limits — if it fails, try a
+              lower resolution or a shorter clip.
+            </span>
+          </div>
+        ) : null
+      }
       controls={
         <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border bg-card p-3">
           <div className="flex flex-1 items-center gap-3 min-w-[180px]">

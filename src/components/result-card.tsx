@@ -54,10 +54,19 @@ export function ResultCard({
   const pct = hasResult ? savedPercent(originalSize, resultSize!) : 0;
   const grew = hasResult ? resultSize! > originalSize : false;
 
+  // Defensive: if status is "done" but we have no result, show an error
+  // instead of a broken card with "…" and a disabled download button.
+  const effectiveStatus =
+    status === "done" && !hasResult ? "error" : status;
+  const effectiveError =
+    status === "done" && !hasResult
+      ? "Compression produced no result. Try again or use a smaller file."
+      : error;
+
   return (
     <div className="flex h-full flex-col gap-3">
       <Card className="flex flex-1 flex-col overflow-hidden p-4">
-        {status === "processing" ? (
+        {effectiveStatus === "processing" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             <p className="text-sm font-medium">{progressLabel ?? "Working…"}</p>
@@ -70,10 +79,10 @@ export function ResultCard({
               </div>
             )}
           </div>
-        ) : status === "error" ? (
+        ) : effectiveStatus === "error" ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
             <AlertCircle className="h-8 w-8 text-destructive" />
-            <p className="max-w-sm text-sm text-destructive">{error}</p>
+            <p className="max-w-sm text-sm text-destructive">{effectiveError}</p>
           </div>
         ) : (
           <div className="flex flex-1 flex-col gap-3">

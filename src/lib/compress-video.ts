@@ -166,11 +166,28 @@ async function compressWithFFmpeg(
 
   args.push(outputName);
 
-  // Progress tracking
+  // Progress tracking + watchdog (detects stalled/crashed ffmpeg)
+  let lastProgressTime = Date.now();
   const progressHandler = ({ progress }: { progress: number }) => {
+    lastProgressTime = Date.now();
     opts.onProgress?.(Math.min(1, Math.max(0, progress)));
   };
   ff.on("progress", progressHandler);
+
+  // Watchdog: if no progress event for 90s, ffmpeg has likely crashed
+  // (common for very large videos that exceed WASM memory limits).
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastProgressTime > 90_000) {
+      try {
+        ff.terminate();
+      } catch {
+        /* noop */
+      }
+      ffmpegInstance = null;
+      loadPromise = null;
+      loadedEngine = null;
+    }
+  }, 10_000);
 
   // Abort support
   let aborted = false;
@@ -196,6 +213,7 @@ async function compressWithFFmpeg(
   try {
     await ff.exec(args);
   } finally {
+    clearInterval(watchdog);
     ff.off("progress", progressHandler);
     if (opts.signal) {
       opts.signal.removeEventListener("abort", abortHandler);
@@ -208,7 +226,9 @@ async function compressWithFFmpeg(
   const mimeType = isMp4 ? "video/mp4" : "video/webm";
 
   if (!data || (data as Uint8Array).length === 0) {
-    throw new Error("Compression produced no output. Try a different format or quality.");
+    throw new Error(
+      "Compression produced no output. The video may be too large for browser processing — try a lower resolution or a shorter clip."
+    );
   }
 
   const blob = new Blob([data as BlobPart], { type: mimeType });
