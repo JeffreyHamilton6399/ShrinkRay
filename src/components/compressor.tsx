@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, AlertCircle, Download, Package } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft } from "lucide-react";
 import { Dropzone } from "@/components/dropzone";
 import { ImageCompressor } from "@/components/image-compressor";
 import { VideoCompressor } from "@/components/video-compressor";
@@ -23,6 +23,7 @@ interface DroppedFile {
 export function Compressor() {
   const [files, setFiles] = React.useState<DroppedFile[]>([]);
   const [showDrop, setShowDrop] = React.useState(true);
+  const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   const handleFiles = (dropped: File[]) => {
     const next: DroppedFile[] = dropped.map((file) => ({
@@ -34,16 +35,22 @@ export function Compressor() {
     setShowDrop(false);
   };
 
-  const removeFile = (id: string) =>
+  const removeFile = (id: string) => {
     setFiles((prev) => {
       const filtered = prev.filter((f) => f.id !== id);
-      if (filtered.length === 0) setShowDrop(true);
+      if (filtered.length === 0) {
+        setShowDrop(true);
+        setSelectedId(null);
+      }
+      if (selectedId === id) setSelectedId(null);
       return filtered;
     });
+  };
 
   const clearAll = () => {
     setFiles([]);
     setShowDrop(true);
+    setSelectedId(null);
   };
 
   // Show dropzone (initial or "add more" mode)
@@ -75,6 +82,42 @@ export function Compressor() {
     );
   }
 
+  // A file is selected from the list → show full controls view
+  const selected = files.find((f) => f.id === selectedId);
+  if (selected) {
+    const { file, kind } = selected;
+    const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
+    return (
+      <div className="flex h-full flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setSelectedId(null)}
+            className="text-muted-foreground"
+          >
+            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+            Back to list
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowDrop(true)}
+            className="text-muted-foreground"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Add files
+          </Button>
+        </div>
+        {kind === "image" && <ImageCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "video" && <VideoCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "audio" && <AudioCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "file" && <FileCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+      </div>
+    );
+  }
+
   // Single file → full UI with controls
   if (files.length === 1) {
     const { file, kind } = files[0];
@@ -101,12 +144,12 @@ export function Compressor() {
     );
   }
 
-  // Multiple files → list view
+  // Multiple files → list view (rows are clickable to open full controls)
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {files.length} files · auto-compressing
+          {files.length} files · click any to adjust settings
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="ghost" onClick={() => setShowDrop(true)}>
@@ -121,7 +164,12 @@ export function Compressor() {
       </div>
       <div className="max-h-[calc(100dvh-180px)] space-y-2 overflow-y-auto pr-1">
         {files.map((item) => (
-          <FileRow key={item.id} item={item} onRemove={() => removeFile(item.id)} />
+          <FileRow
+            key={item.id}
+            item={item}
+            onRemove={() => removeFile(item.id)}
+            onClick={() => setSelectedId(item.id)}
+          />
         ))}
       </div>
     </div>
@@ -136,7 +184,15 @@ interface MiniResult {
   size: number;
 }
 
-function FileRow({ item, onRemove }: { item: DroppedFile; onRemove: () => void }) {
+function FileRow({
+  item,
+  onRemove,
+  onClick,
+}: {
+  item: DroppedFile;
+  onRemove: () => void;
+  onClick: () => void;
+}) {
   const [result, setResult] = React.useState<MiniResult | null>(null);
   const [status, setStatus] = React.useState<"processing" | "done" | "error">("processing");
   const [error, setError] = React.useState<string | null>(null);
@@ -168,7 +224,8 @@ function FileRow({ item, onRemove }: { item: DroppedFile; onRemove: () => void }
     };
   }, [item]);
 
-  const download = () => {
+  const download = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!result) return;
     const a = document.createElement("a");
     a.href = result.url;
@@ -179,11 +236,27 @@ function FileRow({ item, onRemove }: { item: DroppedFile; onRemove: () => void }
     a.remove();
   };
 
+  const remove = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onRemove();
+  };
+
   const pct = result ? savedPercent(item.file.size, result.size) : 0;
   const grew = result ? result.size > item.file.size : false;
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
+    <div
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+      className="group flex cursor-pointer items-center gap-3 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-base">
         <KindIcon kind={item.kind} />
       </div>
@@ -223,7 +296,7 @@ function FileRow({ item, onRemove }: { item: DroppedFile; onRemove: () => void }
           <Download className="h-3.5 w-3.5" />
         </Button>
       )}
-      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={onRemove}>
+      <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive" onClick={remove}>
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -282,7 +355,7 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   const meta = await getVideoMeta(file);
   const r = await compressVideo(
     file,
-    { quality: 50, targetHeight: 720, format: "video/webm" },
+    { quality: 50, targetHeight: 480, format: "video/mp4" },
     meta
   );
   return { blob: r.blob, url: r.url, size: r.blob.size };
