@@ -184,6 +184,26 @@ interface MiniResult {
   size: number;
 }
 
+// Simple concurrency limiter — only 2 files compress at a time.
+// More than 2 causes memory pressure and actually slows things down.
+const CONCURRENCY = 2;
+let activeCount = 0;
+const queue: (() => void)[] = [];
+
+async function withConcurrency<T>(fn: () => Promise<T>): Promise<T> {
+  if (activeCount >= CONCURRENCY) {
+    await new Promise<void>((resolve) => queue.push(resolve));
+  }
+  activeCount++;
+  try {
+    return await fn();
+  } finally {
+    activeCount--;
+    const next = queue.shift();
+    if (next) next();
+  }
+}
+
 function FileRow({
   item,
   onRemove,
@@ -202,7 +222,7 @@ function FileRow({
     let cancelled = false;
     (async () => {
       try {
-        const r = await compressMini(item.file, item.kind);
+        const r = await withConcurrency(() => compressMini(item.file, item.kind));
         if (cancelled) {
           URL.revokeObjectURL(r.url);
           return;
@@ -355,7 +375,7 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   const meta = await getVideoMeta(file);
   const r = await compressVideo(
     file,
-    { quality: 35, targetHeight: 240, format: "video/mp4" },
+    { quality: 30, targetHeight: 240, format: "video/mp4" },
     meta
   );
   return { blob: r.blob, url: r.url, size: r.blob.size };

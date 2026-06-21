@@ -148,7 +148,7 @@ async function compressWithFFmpeg(
     const targetH = Math.round((srcInfo.height * scale) / 2) * 2;
     filters.push(`scale=-2:${targetH}`);
   }
-  filters.push("fps=24"); // drop to 24fps — fewer frames = faster encode
+  filters.push("fps=20"); // 20fps — fewer frames = faster encode
   args.push("-vf", filters.join(","));
 
   if (isMp4) {

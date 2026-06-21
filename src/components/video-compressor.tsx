@@ -62,7 +62,7 @@ export function VideoCompressor({ file, onClear }: Props) {
     "loading-engine" | "compressing" | null
   >(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [quality, setQuality] = React.useState(35);
+  const [quality, setQuality] = React.useState(30);
   const [targetHeight, setTargetHeight] = React.useState(240);
   const [format, setFormat] = React.useState<VideoTargetFormat>("video/mp4");
   const abortRef = React.useRef<AbortController | null>(null);
