@@ -26,18 +26,26 @@ export async function compressFile(file: File): Promise<CompressedArchive> {
   const compressed = await new Promise<Uint8Array>((resolve, reject) => {
     gzip(
       data,
-      { level: 9 }, // max compression for single files (fast enough)
+      { level: 9 }, // max compression for single files
       (err, out) => (err ? reject(err) : resolve(out))
     );
   });
 
-  const blob = new Blob([compressed as BlobPart], { type: "application/gzip" });
+  // Effectiveness: if gzip made the file BIGGER, return the original.
+  // This happens with already-compressed files (mp3, jpg, mp4, etc.)
+  const useOriginal = compressed.length >= data.length;
+  const output = useOriginal ? data : compressed;
+  const ext = useOriginal ? "" : ".gz";
+
+  const blob = new Blob([output as BlobPart], {
+    type: useOriginal ? file.type : "application/gzip",
+  });
   const base = file.name.replace(/\.[^.]+$/, "") || file.name;
   return {
     blob,
     url: URL.createObjectURL(blob),
     size: blob.size,
-    filename: `${base}.gz`,
+    filename: useOriginal ? file.name : `${base}${ext}`,
   };
 }
 

@@ -73,14 +73,18 @@ export async function compressTextFile(file: File): Promise<CompressedText> {
     );
   });
 
-  const blob = new Blob([compressed as BlobPart], {
-    type: "application/gzip",
+  // Effectiveness: if gzip made it bigger, return the minified text uncompressed
+  const useUncompressed = compressed.length >= data.length;
+  const output = useUncompressed ? data : compressed;
+
+  const blob = new Blob([output as BlobPart], {
+    type: useUncompressed ? "text/plain" : "application/gzip",
   });
   const base = file.name.replace(/\.[^.]+$/, "") || file.name;
   return {
     blob,
     url: URL.createObjectURL(blob),
     size: blob.size,
-    filename: `${base}${ext}.gz`,
+    filename: useUncompressed ? `${base}${ext}` : `${base}${ext}.gz`,
   };
 }

@@ -34,14 +34,18 @@ export async function compress3DModel(file: File): Promise<CompressedModel> {
     );
   });
 
-  const blob = new Blob([compressed as BlobPart], {
-    type: "application/gzip",
+  // Effectiveness: if gzip made it bigger, return original
+  const useOriginal = compressed.length >= data.length;
+  const output = useOriginal ? data : compressed;
+
+  const blob = new Blob([output as BlobPart], {
+    type: useOriginal ? file.type : "application/gzip",
   });
   const base = file.name.replace(/\.[^.]+$/, "") || file.name;
   return {
     blob,
     url: URL.createObjectURL(blob),
     size: blob.size,
-    filename: `${base}${ext}.gz`,
+    filename: useOriginal ? file.name : `${base}${ext}.gz`,
   };
 }

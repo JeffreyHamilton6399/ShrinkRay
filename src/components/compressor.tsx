@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package, RotateCcw } from "lucide-react";
 import { Dropzone } from "@/components/dropzone";
 import { ImageCompressor } from "@/components/image-compressor";
 import { VideoCompressor } from "@/components/video-compressor";
@@ -29,7 +29,6 @@ export function Compressor() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   const handleFiles = async (dropped: File[]) => {
-    // Detect kind for each file (async because animated GIFs need checking)
     const next: DroppedFile[] = await Promise.all(
       dropped.map(async (file) => ({
         id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
@@ -59,7 +58,13 @@ export function Compressor() {
     setSelectedId(null);
   };
 
-  // Show dropzone (initial or "add more" mode)
+  // Helper: go back to the right view
+  const goBack = () => {
+    setSelectedId(null);
+    setShowDrop(false); // show list (or single file view)
+  };
+
+  // --- Dropzone view (initial or "add more") ---
   if (showDrop) {
     return (
       <div className="flex flex-1 flex-col gap-3">
@@ -79,7 +84,7 @@ export function Compressor() {
             multiple
             onFiles={handleFiles}
             title={files.length > 0 ? "Drop more files" : "Drop files"}
-            subtitle="One or many — images, video, audio, PDFs, or anything else. Auto-detected and compressed in your browser."
+            subtitle="One or many — images, video, audio, PDFs, 3D models, or anything else. Auto-detected and compressed in your browser."
             icon="file"
             className="max-w-lg"
           />
@@ -88,63 +93,49 @@ export function Compressor() {
     );
   }
 
-  // A file is selected from the list → show full controls view
+  // --- A file is selected from the list → show full controls ---
   const selected = files.find((f) => f.id === selectedId);
   if (selected) {
     const { file, kind } = selected;
     const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
     return (
       <div className="flex h-full flex-col gap-3">
-        <div className="flex items-center">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setSelectedId(null)}
-            className="text-muted-foreground"
-          >
-            <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-            Back to list
-          </Button>
-        </div>
-        {kind === "image" && <ImageCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "video" && <VideoCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "audio" && <AudioCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "svg" && <SvgCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "3d" && <Model3DCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "text" && <TextCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
-        {kind === "file" && <FileCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        <ToolBar
+          onBack={goBack}
+          onAdd={() => setShowDrop(true)}
+          onClear={() => removeFile(selected.id)}
+          showClear={false}
+        />
+        {renderCompressor(kind, file, key, () => removeFile(selected.id))}
       </div>
     );
   }
 
-  // Single file → full UI with controls
+  // --- Single file → full UI with controls ---
   if (files.length === 1) {
     const { file, kind } = files[0];
     const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
     return (
       <div className="flex h-full flex-col gap-3">
-        {kind === "image" && <ImageCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "video" && <VideoCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "audio" && <AudioCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "svg" && <SvgCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "3d" && <Model3DCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "text" && <TextCompressor key={key} file={file} onClear={clearAll} />}
-        {kind === "file" && <FileCompressor key={key} file={file} onClear={clearAll} />}
+        <ToolBar
+          onBack={clearAll}
+          onAdd={() => setShowDrop(true)}
+          onClear={clearAll}
+          backLabel="New"
+        />
+        {renderCompressor(kind, file, key, clearAll)}
       </div>
     );
   }
 
-  // Multiple files → list view (rows are clickable to open full controls)
+  // --- Multiple files → list view ---
   const downloadAll = async () => {
-    // Find all per-file download buttons in the list and click them sequentially
     const buttons = document.querySelectorAll<HTMLButtonElement>(
       '[data-download-btn="true"]'
     );
     for (const btn of buttons) {
       btn.click();
-      await new Promise((r) => setTimeout(r, 300)); // small delay between downloads
+      await new Promise((r) => setTimeout(r, 300));
     }
   };
 
@@ -183,6 +174,73 @@ export function Compressor() {
   );
 }
 
+// --- Persistent toolbar for single/selected file views ---
+function ToolBar({
+  onBack,
+  onAdd,
+  onClear,
+  backLabel = "Back",
+  showClear = true,
+}: {
+  onBack: () => void;
+  onAdd: () => void;
+  onClear: () => void;
+  backLabel?: string;
+  showClear?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onBack}
+        className="text-muted-foreground"
+      >
+        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+        {backLabel}
+      </Button>
+      <div className="flex gap-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onAdd}
+          className="text-muted-foreground"
+        >
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
+          Add more
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// --- Render the right compressor for a file kind ---
+function renderCompressor(
+  kind: MediaKind,
+  file: File,
+  key: string,
+  onClear: () => void
+) {
+  switch (kind) {
+    case "image":
+      return <ImageCompressor key={key} file={file} onClear={onClear} />;
+    case "video":
+      return <VideoCompressor key={key} file={file} onClear={onClear} />;
+    case "audio":
+      return <AudioCompressor key={key} file={file} onClear={onClear} />;
+    case "pdf":
+      return <PdfCompressor key={key} file={file} onClear={onClear} />;
+    case "svg":
+      return <SvgCompressor key={key} file={file} onClear={onClear} />;
+    case "3d":
+      return <Model3DCompressor key={key} file={file} onClear={onClear} />;
+    case "text":
+      return <TextCompressor key={key} file={file} onClear={onClear} />;
+    default:
+      return <FileCompressor key={key} file={file} onClear={onClear} />;
+  }
+}
+
 // --- Inline mini compressor for multi-file list ---
 
 interface MiniResult {
@@ -192,7 +250,6 @@ interface MiniResult {
 }
 
 // Simple concurrency limiter — only 2 files compress at a time.
-// More than 2 causes memory pressure and actually slows things down.
 const CONCURRENCY = 2;
 let activeCount = 0;
 const queue: (() => void)[] = [];
@@ -347,6 +404,7 @@ function extFor(blob: Blob): string {
   if (t.includes("png")) return "png";
   if (t.includes("svg")) return "svg";
   if (t.includes("avif")) return "avif";
+  if (t.includes("gzip")) return "gz";
   return "bin";
 }
 
