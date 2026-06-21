@@ -60,17 +60,34 @@ async function loadFFmpeg(): Promise<{ ff: FFmpeg; engine: "ffmpeg-mt" | "ffmpeg
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
-    // Use ST core with toBlobURL (most reliable across environments).
-    // MT core hangs in some browsers due to worker/COEP issues.
+    // Try MT core first (2-4x faster, uses multiple CPU cores via Worker).
+    // Works on real browsers with COOP/COEP headers (Vercel production).
+    // Falls back to ST if MT hangs/fails (headless environments).
+    if (hasSharedArrayBuffer()) {
+      try {
+        const ff = new FFmpeg();
+        const coreURL = await toBlobURL("/ffmpeg/ffmpeg-core.js", "text/javascript");
+        const wasmURL = await toBlobURL("/ffmpeg/ffmpeg-core.wasm", "application/wasm");
+        const workerURL = await toBlobURL("/ffmpeg/ffmpeg-core.worker.js", "text/javascript");
+
+        await Promise.race([
+          ff.load({ coreURL, wasmURL, workerURL }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("MT timeout")), 8_000)
+          ),
+        ]);
+        ffmpegInstance = ff;
+        loadedEngine = "ffmpeg-mt";
+        return { ff, engine: "ffmpeg-mt" as const };
+      } catch {
+        // MT failed/timed out — fall through to ST
+      }
+    }
+
+    // ST core — always works, single-threaded but reliable
     const ff = new FFmpeg();
-    const coreURL = await toBlobURL(
-      "/ffmpeg/st/ffmpeg-core.js",
-      "text/javascript"
-    );
-    const wasmURL = await toBlobURL(
-      "/ffmpeg/st/ffmpeg-core.wasm",
-      "application/wasm"
-    );
+    const coreURL = await toBlobURL("/ffmpeg/st/ffmpeg-core.js", "text/javascript");
+    const wasmURL = await toBlobURL("/ffmpeg/st/ffmpeg-core.wasm", "application/wasm");
 
     await Promise.race([
       ff.load({ coreURL, wasmURL }),
@@ -148,7 +165,7 @@ async function compressWithFFmpeg(
     const targetH = Math.round((srcInfo.height * scale) / 2) * 2;
     filters.push(`scale=-2:${targetH}`);
   }
-  filters.push("fps=20"); // 20fps — fewer frames = faster encode
+  filters.push("fps=15"); // 15fps — fewer frames = faster encode
   args.push("-vf", filters.join(","));
 
   if (isMp4) {

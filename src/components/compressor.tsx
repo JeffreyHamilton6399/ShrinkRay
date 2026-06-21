@@ -375,7 +375,7 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   const meta = await getVideoMeta(file);
   const r = await compressVideo(
     file,
-    { quality: 30, targetHeight: 240, format: "video/mp4" },
+    { quality: 25, targetHeight: 144, format: "video/mp4" },
     meta
   );
   return { blob: r.blob, url: r.url, size: r.blob.size };

@@ -46,6 +46,7 @@ const PRESETS = [
   { value: "720", label: "720p" },
   { value: "480", label: "480p" },
   { value: "360", label: "360p" },
+  { value: "144", label: "144p" },
 ];
 
 export function VideoCompressor({ file, onClear }: Props) {
@@ -62,8 +63,8 @@ export function VideoCompressor({ file, onClear }: Props) {
     "loading-engine" | "compressing" | null
   >(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [quality, setQuality] = React.useState(30);
-  const [targetHeight, setTargetHeight] = React.useState(240);
+  const [quality, setQuality] = React.useState(25);
+  const [targetHeight, setTargetHeight] = React.useState(144);
   const [format, setFormat] = React.useState<VideoTargetFormat>("video/mp4");
   const abortRef = React.useRef<AbortController | null>(null);
 
