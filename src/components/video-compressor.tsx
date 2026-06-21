@@ -12,8 +12,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Square, Info } from "lucide-react";
+import { Square, Info, Zap, Gauge, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   compressVideo,
   type VideoTargetFormat,
@@ -49,6 +50,17 @@ const PRESETS = [
   { value: "144", label: "144p" },
 ];
 
+type SpeedPreset = "fast" | "balanced" | "best";
+
+const SPEED_PRESETS: Record<
+  SpeedPreset,
+  { label: string; icon: React.ComponentType<{ className?: string }>; quality: number; targetHeight: number; fps: number }
+> = {
+  fast: { label: "Fast", icon: Zap, quality: 25, targetHeight: 144, fps: 15 },
+  balanced: { label: "Balanced", icon: Gauge, quality: 40, targetHeight: 360, fps: 24 },
+  best: { label: "Best", icon: Sparkles, quality: 55, targetHeight: 720, fps: 30 },
+};
+
 export function VideoCompressor({ file, onClear }: Props) {
   const originalUrl = React.useMemo(() => URL.createObjectURL(file), [file]);
   React.useEffect(() => () => URL.revokeObjectURL(originalUrl), [originalUrl]);
@@ -63,9 +75,10 @@ export function VideoCompressor({ file, onClear }: Props) {
     "loading-engine" | "compressing" | null
   >(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [quality, setQuality] = React.useState(25);
-  const [targetHeight, setTargetHeight] = React.useState(144);
+  const [quality, setQuality] = React.useState(40);
+  const [targetHeight, setTargetHeight] = React.useState(360);
   const [format, setFormat] = React.useState<VideoTargetFormat>("video/mp4");
+  const [speedPreset, setSpeedPreset] = React.useState<SpeedPreset>("balanced");
   const abortRef = React.useRef<AbortController | null>(null);
 
   // Load metadata on mount.
@@ -114,6 +127,7 @@ export function VideoCompressor({ file, onClear }: Props) {
         {
           quality,
           targetHeight,
+          fps: SPEED_PRESETS[speedPreset].fps,
           format,
           signal: controller.signal,
           onProgress: (ratio) => {
@@ -145,7 +159,7 @@ export function VideoCompressor({ file, onClear }: Props) {
       setStatus("error");
       setEnginePhase(null);
     }
-  }, [file, src, quality, targetHeight, format]);
+  }, [file, src, quality, targetHeight, format, speedPreset]);
 
   // Auto-start when metadata is ready.
   // Settings changes are debounced — re-runs 500ms after user stops adjusting.
@@ -155,9 +169,15 @@ export function VideoCompressor({ file, onClear }: Props) {
       start();
     }, 500);
     return () => clearTimeout(t);
-  }, [src, quality, targetHeight, format]);
+  }, [src, quality, targetHeight, format, speedPreset, start]);
 
   React.useEffect(() => () => abortRef.current?.abort(), []);
+
+  const applyPreset = (preset: SpeedPreset) => {
+    setSpeedPreset(preset);
+    setQuality(SPEED_PRESETS[preset].quality);
+    setTargetHeight(SPEED_PRESETS[preset].targetHeight);
+  };
 
   const cancel = () => {
     abortRef.current?.abort();
@@ -243,7 +263,30 @@ export function VideoCompressor({ file, onClear }: Props) {
         ) : null
       }
       controls={
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3 rounded-xl border bg-card p-3">
+        <div className="space-y-3 rounded-xl border bg-card p-3">
+          <div className="flex items-center gap-2">
+            <ToggleGroup
+              type="single"
+              value={speedPreset}
+              onValueChange={(v) => v && applyPreset(v as SpeedPreset)}
+              className="gap-1"
+            >
+              {(Object.keys(SPEED_PRESETS) as SpeedPreset[]).map((key) => {
+                const p = SPEED_PRESETS[key];
+                return (
+                  <ToggleGroupItem
+                    key={key}
+                    value={key}
+                    className="h-8 gap-1 px-3 text-xs"
+                  >
+                    <p.icon className="h-3.5 w-3.5" />
+                    {p.label}
+                  </ToggleGroupItem>
+                );
+              })}
+            </ToggleGroup>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
           <div className="flex flex-1 items-center gap-3 min-w-[180px]">
             <Label className="shrink-0 text-xs text-muted-foreground">
               Quality
@@ -304,6 +347,7 @@ export function VideoCompressor({ file, onClear }: Props) {
               </Button>
             </div>
           )}
+          </div>
         </div>
       }
     />

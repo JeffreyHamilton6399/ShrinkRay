@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package } from "lucide-react";
 import { Dropzone } from "@/components/dropzone";
 import { ImageCompressor } from "@/components/image-compressor";
 import { VideoCompressor } from "@/components/video-compressor";
@@ -145,6 +145,17 @@ export function Compressor() {
   }
 
   // Multiple files → list view (rows are clickable to open full controls)
+  const downloadAll = async () => {
+    // Find all per-file download buttons in the list and click them sequentially
+    const buttons = document.querySelectorAll<HTMLButtonElement>(
+      '[data-download-btn="true"]'
+    );
+    for (const btn of buttons) {
+      btn.click();
+      await new Promise((r) => setTimeout(r, 300)); // small delay between downloads
+    }
+  };
+
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -152,6 +163,10 @@ export function Compressor() {
           {files.length} files · click any to adjust settings
         </p>
         <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={downloadAll}>
+            <Package className="mr-1.5 h-3.5 w-3.5" />
+            Download all
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setShowDrop(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add
@@ -312,7 +327,7 @@ function FileRow({
         </div>
       </div>
       {status === "done" && result && (
-        <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={download}>
+        <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={download} data-download-btn="true">
           <Download className="h-3.5 w-3.5" />
         </Button>
       )}

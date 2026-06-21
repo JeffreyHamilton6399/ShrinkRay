@@ -20,6 +20,7 @@ export type VideoTargetFormat = "video/webm" | "video/mp4";
 export interface CompressVideoOptions {
   quality: number;
   targetHeight: number;
+  fps?: number; // target framerate (default 24)
   format: VideoTargetFormat;
   signal?: AbortSignal;
   onProgress?: (ratio: number) => void;
@@ -168,7 +169,7 @@ async function compressWithFFmpeg(
     const targetH = Math.round((srcInfo.height * scale) / 2) * 2;
     filters.push(`scale=-2:${targetH}`);
   }
-  filters.push("fps=15"); // 15fps — fewer frames = faster encode
+  filters.push(`fps=${opts.fps ?? 24}`); // reduce framerate — fewer frames = faster
   args.push("-vf", filters.join(","));
 
   if (isMp4) {
