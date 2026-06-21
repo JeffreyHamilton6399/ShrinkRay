@@ -82,10 +82,11 @@ export function FileCompressor({ file, onClear }: Props) {
       status={status}
       resultSize={res?.size}
       error={error ?? undefined}
+      progressLabel="Compressing…"
       preview={
         <div className="flex flex-col items-center gap-2 py-2 text-muted-foreground">
           <FileArchive className="h-12 w-12 text-emerald-500" />
-          <p className="text-xs">→ {res?.filename ?? "compressed.zip"}</p>
+          <p className="text-xs">→ {res?.filename ?? "compressed.gz"}</p>
         </div>
       }
       onDownload={download}

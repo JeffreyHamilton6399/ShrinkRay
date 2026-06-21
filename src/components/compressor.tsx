@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Loader2, AlertCircle, Download, ArrowLeft, Package } from "lucide-react";
 import { Dropzone } from "@/components/dropzone";
 import { ImageCompressor } from "@/components/image-compressor";
 import { VideoCompressor } from "@/components/video-compressor";

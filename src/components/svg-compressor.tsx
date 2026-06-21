@@ -75,6 +75,7 @@ export function SvgCompressor({ file, onClear }: Props) {
       status={status}
       resultSize={result?.size}
       error={error ?? undefined}
+      progressLabel="Minifying SVG…"
       preview={
         <img
           src={status === "done" && result ? result.url : URL.createObjectURL(file)}
