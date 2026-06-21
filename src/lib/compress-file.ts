@@ -1,13 +1,16 @@
 /**
- * Generic file compression — wraps ANY file into a .zip using fflate.
+ * Generic file compression — wraps ANY file into a compressed archive.
+ *
+ * For single files we use gzip (better ratio than zip, no archive overhead).
+ * Everything runs in the browser — nothing is uploaded.
  *
  * This genuinely shrinks text-based and uncompressed files (txt, csv, json,
  * html, js, logs, docs, bmp, tiff, etc.). Already-compressed formats (mp3,
  * jpg, png, mp4, zip, office docs, etc.) won't shrink much — we surface
- * that honestly. Everything runs in the browser — nothing is uploaded.
+ * that honestly.
  */
 
-import { zip } from "fflate";
+import { gzip } from "fflate";
 
 export interface CompressedArchive {
   blob: Blob;
@@ -19,21 +22,22 @@ export interface CompressedArchive {
 export async function compressFile(file: File): Promise<CompressedArchive> {
   const data = new Uint8Array(await file.arrayBuffer());
 
-  const zipped = await new Promise<Uint8Array>((resolve, reject) => {
-    zip(
-      { [file.name]: data },
-      { level: 6 }, // level 6 = 2-3x faster than 9, ~1% larger output
+  // gzip is better than zip for single files (no archive header overhead)
+  const compressed = await new Promise<Uint8Array>((resolve, reject) => {
+    gzip(
+      data,
+      { level: 9 }, // max compression for single files (fast enough)
       (err, out) => (err ? reject(err) : resolve(out))
     );
   });
 
-  const blob = new Blob([zipped as BlobPart], { type: "application/zip" });
+  const blob = new Blob([compressed as BlobPart], { type: "application/gzip" });
   const base = file.name.replace(/\.[^.]+$/, "") || file.name;
   return {
     blob,
     url: URL.createObjectURL(blob),
     size: blob.size,
-    filename: `${base}.zip`,
+    filename: `${base}.gz`,
   };
 }
 

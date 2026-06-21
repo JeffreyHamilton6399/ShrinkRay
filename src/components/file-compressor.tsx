@@ -90,7 +90,7 @@ export function FileCompressor({ file, onClear }: Props) {
       }
       onDownload={download}
       onClear={clear}
-      downloadLabel="Download ZIP"
+      downloadLabel="Download .gz"
       warning={
         wasIncompressible && res && grew ? (
           <div className="flex items-start gap-2 rounded-md bg-amber-50 p-2.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">

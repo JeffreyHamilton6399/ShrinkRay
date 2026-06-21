@@ -9,6 +9,7 @@ import { AudioCompressor } from "@/components/audio-compressor";
 import { PdfCompressor } from "@/components/pdf-compressor";
 import { FileCompressor } from "@/components/file-compressor";
 import { SvgCompressor } from "@/components/svg-compressor";
+import { Model3DCompressor } from "@/components/model-3d-compressor";
 import { detectKindAsync, type MediaKind } from "@/lib/detect";
 import { formatBytes, savedPercent, shortFileName } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ export function Compressor() {
     const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
     return (
       <div className="flex h-full flex-col gap-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center">
           <Button
             size="sm"
             variant="ghost"
@@ -103,21 +104,13 @@ export function Compressor() {
             <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
             Back to list
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowDrop(true)}
-            className="text-muted-foreground"
-          >
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Add files
-          </Button>
         </div>
         {kind === "image" && <ImageCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "video" && <VideoCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "audio" && <AudioCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "svg" && <SvgCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
+        {kind === "3d" && <Model3DCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
         {kind === "file" && <FileCompressor key={key} file={file} onClear={() => removeFile(selected.id)} />}
       </div>
     );
@@ -129,22 +122,12 @@ export function Compressor() {
     const key = `${kind}-${file.name}-${file.size}-${file.lastModified}`;
     return (
       <div className="flex h-full flex-col gap-3">
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowDrop(true)}
-            className="text-muted-foreground"
-          >
-            <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Add files
-          </Button>
-        </div>
         {kind === "image" && <ImageCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "video" && <VideoCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "audio" && <AudioCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "pdf" && <PdfCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "svg" && <SvgCompressor key={key} file={file} onClear={clearAll} />}
+        {kind === "3d" && <Model3DCompressor key={key} file={file} onClear={clearAll} />}
         {kind === "file" && <FileCompressor key={key} file={file} onClear={clearAll} />}
       </div>
     );
@@ -345,7 +328,7 @@ function FileRow({
 }
 
 function KindIcon({ kind }: { kind: MediaKind }) {
-  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", svg: "✏️", file: "📦" };
+  const icons = { image: "🖼", video: "🎬", audio: "🎵", pdf: "📄", svg: "✏️", "3d": "📦", file: "📦" };
   return <span>{icons[kind]}</span>;
 }
 
@@ -386,6 +369,11 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   if (kind === "svg") {
     const { compressSvg } = await import("@/lib/compress-svg");
     const r = await compressSvg(file);
+    return { blob: r.blob, url: r.url, size: r.size };
+  }
+  if (kind === "3d") {
+    const { compress3DModel } = await import("@/lib/compress-3d");
+    const r = await compress3DModel(file);
     return { blob: r.blob, url: r.url, size: r.size };
   }
   if (kind === "audio") {
