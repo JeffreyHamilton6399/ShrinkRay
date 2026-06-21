@@ -313,8 +313,8 @@ async function convertWithThree(
   if (format === "stl") {
     const { STLExporter } = await import("three/examples/jsm/exporters/STLExporter.js");
     const exporter = new STLExporter();
-    const stlString = exporter.parse(scene as THREE.Scene, { binary: true });
-    const blob = new Blob([stlString as BlobPart], { type: "model/stl" });
+    const stlData = exporter.parse(scene as THREE.Scene, { binary: true });
+    const blob = new Blob([stlData as BlobPart], { type: "model/stl" });
     return {
       blob,
       url: URL.createObjectURL(blob),

@@ -27,6 +27,9 @@ export function Compressor() {
   const [files, setFiles] = React.useState<DroppedFile[]>([]);
   const [showDrop, setShowDrop] = React.useState(true);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [downloadFns, setDownloadFns] = React.useState<Map<string, () => void>>(
+    new Map()
+  );
 
   const handleFiles = async (dropped: File[]) => {
     const next: DroppedFile[] = await Promise.all(
@@ -41,18 +44,20 @@ export function Compressor() {
   };
 
   const removeFile = (id: string) => {
-    setFiles((prev) => {
-      const filtered = prev.filter((f) => f.id !== id);
-      if (filtered.length === 0) {
-        setShowDrop(true);
-        setSelectedId(null);
-      }
-      if (selectedId === id) setSelectedId(null);
-      return filtered;
+    setDownloadFns((prev) => {
+      const next = new Map(prev);
+      next.delete(id);
+      return next;
     });
+    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setSelectedId((prev) => (prev === id ? null : prev));
+    if (files.length <= 1) {
+      setShowDrop(true);
+    }
   };
 
   const clearAll = () => {
+    setDownloadFns(new Map());
     setFiles([]);
     setShowDrop(true);
     setSelectedId(null);
@@ -129,11 +134,8 @@ export function Compressor() {
 
   // --- Multiple files → list view ---
   const downloadAll = async () => {
-    const buttons = document.querySelectorAll<HTMLButtonElement>(
-      '[data-download-btn="true"]'
-    );
-    for (const btn of buttons) {
-      btn.click();
+    for (const fn of downloadFns.values()) {
+      fn();
       await new Promise((r) => setTimeout(r, 300));
     }
   };
@@ -166,6 +168,16 @@ export function Compressor() {
             item={item}
             onRemove={() => removeFile(item.id)}
             onClick={() => setSelectedId(item.id)}
+            registerDownload={(fn) =>
+              setDownloadFns((prev) => new Map(prev).set(item.id, fn))
+            }
+            unregisterDownload={() =>
+              setDownloadFns((prev) => {
+                const next = new Map(prev);
+                next.delete(item.id);
+                return next;
+              })
+            }
           />
         ))}
       </div>
@@ -231,10 +243,14 @@ function FileRow({
   item,
   onRemove,
   onClick,
+  registerDownload,
+  unregisterDownload,
 }: {
   item: DroppedFile;
   onRemove: () => void;
   onClick: () => void;
+  registerDownload: (fn: () => void) => void;
+  unregisterDownload: () => void;
 }) {
   const [result, setResult] = React.useState<MiniResult | null>(null);
   const [status, setStatus] = React.useState<"processing" | "done" | "error">("processing");
@@ -267,8 +283,8 @@ function FileRow({
     };
   }, [item]);
 
-  const download = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const download = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!result) return;
     const a = document.createElement("a");
     a.href = result.url;
@@ -278,6 +294,14 @@ function FileRow({
     a.click();
     a.remove();
   };
+
+  // Register/unregister download function for "Download all" button
+  React.useEffect(() => {
+    if (status === "done" && result) {
+      registerDownload(() => download());
+      return () => unregisterDownload();
+    }
+  }, [status, result]);
 
   const remove = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -335,7 +359,7 @@ function FileRow({
         </div>
       </div>
       {status === "done" && result && (
-        <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={download} data-download-btn="true">
+        <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={download}>
           <Download className="h-3.5 w-3.5" />
         </Button>
       )}

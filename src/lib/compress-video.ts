@@ -176,9 +176,9 @@ async function compressWithFFmpeg(
   const crf = qualityToCrf(opts.quality, opts.format);
   const args: string[] = ["-i", inputName];
 
-  // Combined video filter: scale + reduce framerate to 24fps in one pass.
-  // Framerate reduction is the single biggest speedup for ST ffmpeg —
-  // a 60fps source becomes 24fps = 2.5x fewer frames to encode.
+  // Combined video filter: scale + reduce framerate in one pass.
+  // Only apply fps filter if targetHeight is set (not "Original" resolution).
+  // "Original" preserves both resolution AND framerate for max quality.
   const filters: string[] = [];
   if (opts.targetHeight > 0) {
     const scale = Math.min(
@@ -187,9 +187,13 @@ async function compressWithFFmpeg(
     );
     const targetH = Math.round((srcInfo.height * scale) / 2) * 2;
     filters.push(`scale=-2:${targetH}`);
+    if (opts.fps) {
+      filters.push(`fps=${opts.fps}`);
+    }
   }
-  filters.push(`fps=${opts.fps ?? 24}`); // reduce framerate — fewer frames = faster
-  args.push("-vf", filters.join(","));
+  if (filters.length > 0) {
+    args.push("-vf", filters.join(","));
+  }
 
   if (isMp4) {
     const qualityMode = opts.encodeMode === "quality";

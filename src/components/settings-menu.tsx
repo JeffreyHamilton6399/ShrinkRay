@@ -82,16 +82,20 @@ export function SettingsMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <LegalDialog
-        kind="privacy"
-        open={legal === "privacy"}
-        onOpenChange={(v) => !v && setLegal(null)}
-      />
-      <LegalDialog
-        kind="terms"
-        open={legal === "terms"}
-        onOpenChange={(v) => !v && setLegal(null)}
-      />
+      {legal === "privacy" && (
+        <LegalDialog
+          kind="privacy"
+          open={true}
+          onOpenChange={() => setLegal(null)}
+        />
+      )}
+      {legal === "terms" && (
+        <LegalDialog
+          kind="terms"
+          open={true}
+          onOpenChange={() => setLegal(null)}
+        />
+      )}
     </>
   );
 }
