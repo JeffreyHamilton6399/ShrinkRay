@@ -26,7 +26,7 @@ export function PdfCompressor({ file, onClear }: Props) {
   const [progress, setProgress] = React.useState(0);
   const [pageInfo, setPageInfo] = React.useState({ page: 0, total: 0 });
   const [error, setError] = React.useState<string | null>(null);
-  const [quality, setQuality] = React.useState(45);
+  const [quality, setQuality] = React.useState(35);
   const abortRef = React.useRef<AbortController | null>(null);
 
   const start = React.useCallback(async () => {

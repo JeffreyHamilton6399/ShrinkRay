@@ -367,7 +367,7 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   }
   if (kind === "pdf") {
     const { compressPdf } = await import("@/lib/compress-pdf");
-    const r = await compressPdf(file, { quality: 45 });
+    const r = await compressPdf(file, { quality: 35 });
     return { blob: r.blob, url: r.url, size: r.blob.size };
   }
   // video

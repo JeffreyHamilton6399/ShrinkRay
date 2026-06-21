@@ -22,7 +22,7 @@ export async function compressFile(file: File): Promise<CompressedArchive> {
   const zipped = await new Promise<Uint8Array>((resolve, reject) => {
     zip(
       { [file.name]: data },
-      { level: 9 },
+      { level: 6 }, // level 6 = 2-3x faster than 9, ~1% larger output
       (err, out) => (err ? reject(err) : resolve(out))
     );
   });

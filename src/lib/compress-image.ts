@@ -98,21 +98,29 @@ export async function compressImage(
 
   const { w, h } = computeDimensions(srcW, srcH, opts.maxWidth, opts.maxHeight);
 
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
+  // Use OffscreenCanvas when available — encoding runs off the main thread.
+  let canvas: HTMLCanvasElement | OffscreenCanvas;
+  let ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+  if (typeof OffscreenCanvas !== "undefined") {
+    canvas = new OffscreenCanvas(w, h);
+    ctx = canvas.getContext("2d") as OffscreenCanvasRenderingContext2D;
+  } else {
+    canvas = document.createElement("canvas");
+    (canvas as HTMLCanvasElement).width = w;
+    (canvas as HTMLCanvasElement).height = h;
+    ctx = (canvas as HTMLCanvasElement).getContext("2d")!;
+  }
   if (!ctx) throw new Error("Canvas 2D context unavailable");
 
   // Fill background when converting transparency → jpeg
   if (opts.format === "image/jpeg" && opts.background) {
-    ctx.fillStyle = opts.background;
+    (ctx as CanvasRenderingContext2D).fillStyle = opts.background;
     ctx.fillRect(0, 0, w, h);
   }
 
-  // Disable expensive smoothing for speed — the scale is usually down anyway.
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = "medium"; // "high" is slower, negligible diff
+  ctx.imageSmoothingQuality = "medium";
   ctx.drawImage(bitmap as CanvasImageSource, 0, 0, w, h);
 
   // Free the bitmap/Image immediately
@@ -121,13 +129,22 @@ export async function compressImage(
   }
   if (revokeUrl) URL.revokeObjectURL(revokeUrl);
 
-  const blob: Blob = await new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error("Encoding failed"))),
-      opts.format,
-      opts.format === "image/png" ? undefined : opts.quality
-    );
-  });
+  // Encode — OffscreenCanvas.convertToBlob is async + off-main-thread
+  let blob: Blob;
+  if (canvas instanceof OffscreenCanvas) {
+    blob = await canvas.convertToBlob({
+      type: opts.format,
+      quality: opts.format === "image/png" ? undefined : opts.quality,
+    });
+  } else {
+    blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error("Encoding failed"))),
+        opts.format,
+        opts.format === "image/png" ? undefined : opts.quality
+      );
+    });
+  }
 
   return {
     blob,
