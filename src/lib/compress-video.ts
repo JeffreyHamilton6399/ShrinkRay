@@ -60,32 +60,27 @@ async function loadFFmpeg(): Promise<{ ff: FFmpeg; engine: "ffmpeg-mt" | "ffmpeg
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
-    const useMT = hasSharedArrayBuffer();
-    const base = useMT ? "/ffmpeg" : "/ffmpeg/st";
-
+    // Use ST core with toBlobURL (most reliable across environments).
+    // MT core hangs in some browsers due to worker/COEP issues.
     const ff = new FFmpeg();
-    // toBlobURL is needed even for same-origin files because ffmpeg's worker
-    // uses importScripts, which has COEP quirks with direct URLs.
     const coreURL = await toBlobURL(
-      `${base}/ffmpeg-core.js`,
+      "/ffmpeg/st/ffmpeg-core.js",
       "text/javascript"
     );
     const wasmURL = await toBlobURL(
-      `${base}/ffmpeg-core.wasm`,
+      "/ffmpeg/st/ffmpeg-core.wasm",
       "application/wasm"
     );
-    const config = { coreURL, wasmURL };
-    if (useMT) {
-      config.workerURL = await toBlobURL(
-        `${base}/ffmpeg-core.worker.js`,
-        "text/javascript"
-      );
-    }
 
-    await ff.load(config);
+    await Promise.race([
+      ff.load({ coreURL, wasmURL }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Engine load timed out")), 30_000)
+      ),
+    ]);
     ffmpegInstance = ff;
-    loadedEngine = useMT ? "ffmpeg-mt" : "ffmpeg-st";
-    return { ff, engine: loadedEngine };
+    loadedEngine = "ffmpeg-st";
+    return { ff, engine: "ffmpeg-st" as const };
   })();
 
   try {
