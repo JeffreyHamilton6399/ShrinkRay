@@ -33,7 +33,7 @@ const ICONS: Record<DropIcon, React.ComponentType<{ className?: string }>> = {
 
 export function Dropzone({
   accept,
-  multiple = false,
+  multiple = true,
   onFiles,
   title,
   subtitle,

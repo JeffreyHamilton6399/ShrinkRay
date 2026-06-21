@@ -1,13 +1,12 @@
 /**
  * Video compression via ffmpeg.wasm — processes frames as fast as the CPU
- * allows (not bound to real-time playback like MediaRecorder). The ffmpeg
- * core (~25 MB) is loaded lazily from a CDN on first use, then cached by
- * the browser. Multi-threaded when SharedArrayBuffer is available (needs
- * COOP/COEP headers, configured in next.config.ts); falls back to single-
- * threaded otherwise. Everything runs in the browser — nothing is uploaded.
+ * allows (not bound to real-time playback like MediaRecorder). Uses the
+ * single-threaded core for maximum reliability (no COOP/COEP headers needed).
+ * The ffmpeg core (~25 MB) is loaded lazily from a CDN on first use, then
+ * cached by the browser. Everything runs in the browser — nothing is uploaded.
  *
- * Fallback: if ffmpeg.wasm fails to load (rare), we fall back to the
- * MediaRecorder real-time approach so the tool always works.
+ * Fallback: if ffmpeg.wasm fails to load, falls back to MediaRecorder
+ * (real-time) so the tool always works.
  */
 
 import { FFmpeg } from "@ffmpeg/ffmpeg";
@@ -16,9 +15,7 @@ import { toBlobURL, fetchFile } from "@ffmpeg/util";
 export type VideoTargetFormat = "video/webm" | "video/mp4";
 
 export interface CompressVideoOptions {
-  /** 1..100 — higher = better quality, larger file. Maps to CRF. */
   quality: number;
-  /** Target long-edge resolution. 0 = keep original. */
   targetHeight: number;
   format: VideoTargetFormat;
   signal?: AbortSignal;
@@ -43,39 +40,29 @@ export function isSupportedVideo(file: File): boolean {
   );
 }
 
-// --- ffmpeg.wasm engine ---
+// --- ffmpeg.wasm engine (single-threaded for reliability) ---
 
 const CORE_VERSION = "0.12.10";
-const MT_BASE = `https://unpkg.com/@ffmpeg/core-mt@${CORE_VERSION}/dist/umd`;
-const ST_BASE = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd`;
+const CORE_BASE = `https://unpkg.com/@ffmpeg/core@${CORE_VERSION}/dist/umd`;
 
 let ffmpegInstance: FFmpeg | null = null;
 let loadPromise: Promise<FFmpeg> | null = null;
 
-function hasSharedArrayBuffer(): boolean {
-  return typeof SharedArrayBuffer !== "undefined";
-}
-
-async function loadFFmpeg(): Promise<FFmpeg> {
+async function loadFFmpeg(onProgress?: (msg: string) => void): Promise<FFmpeg> {
   if (ffmpegInstance) return ffmpegInstance;
   if (loadPromise) return loadPromise;
 
   loadPromise = (async () => {
     const ff = new FFmpeg();
-    const base = hasSharedArrayBuffer() ? MT_BASE : ST_BASE;
-
-    const config: Parameters<FFmpeg["load"]>[0] = {
-      coreURL: await toBlobURL(`${base}/ffmpeg-core.js`, "text/javascript"),
-      wasmURL: await toBlobURL(`${base}/ffmpeg-core.wasm`, "application/wasm"),
-    };
-    if (hasSharedArrayBuffer()) {
-      config.workerURL = await toBlobURL(
-        `${base}/ffmpeg-core.worker.js`,
-        "text/javascript"
-      );
-    }
-
-    await ff.load(config);
+    const coreURL = await toBlobURL(
+      `${CORE_BASE}/ffmpeg-core.js`,
+      "text/javascript"
+    );
+    const wasmURL = await toBlobURL(
+      `${CORE_BASE}/ffmpeg-core.wasm`,
+      "application/wasm"
+    );
+    await ff.load({ coreURL, wasmURL });
     ffmpegInstance = ff;
     return ff;
   })();
@@ -84,18 +71,18 @@ async function loadFFmpeg(): Promise<FFmpeg> {
     return await loadPromise;
   } catch (e) {
     loadPromise = null;
-    throw e;
+    ffmpegInstance = null;
+    throw new Error(
+      `Could not load the compression engine. ${e instanceof Error ? e.message : ""}`
+    );
   }
 }
 
-/** Map quality 1..100 → CRF (lower CRF = higher quality). */
 function qualityToCrf(quality: number, format: VideoTargetFormat): number {
   const q = Math.max(1, Math.min(100, quality));
   if (format === "video/mp4") {
-    // x264 CRF: 18 (excellent) → 40 (very small)
     return Math.round(40 - ((q - 1) / 99) * (40 - 18));
   }
-  // VP8 CRF: 10 (excellent) → 40 (very small)
   return Math.round(40 - ((q - 1) / 99) * (40 - 10));
 }
 
@@ -119,10 +106,12 @@ async function compressWithFFmpeg(
   const crf = qualityToCrf(opts.quality, opts.format);
   const args: string[] = ["-i", inputName];
 
-  // Scale filter (keep aspect ratio, ensure even dimensions)
   if (opts.targetHeight > 0) {
-    const scale = Math.min(1, opts.targetHeight / Math.max(srcInfo.width, srcInfo.height));
-    const targetH = Math.round(srcInfo.height * scale / 2) * 2;
+    const scale = Math.min(
+      1,
+      opts.targetHeight / Math.max(srcInfo.width, srcInfo.height)
+    );
+    const targetH = Math.round((srcInfo.height * scale) / 2) * 2;
     args.push("-vf", `scale=-2:${targetH}`);
   }
 
@@ -149,13 +138,11 @@ async function compressWithFFmpeg(
 
   args.push(outputName);
 
-  // Progress
   const progressHandler = ({ progress }: { progress: number }) => {
     opts.onProgress?.(Math.min(1, Math.max(0, progress)));
   };
   ff.on("progress", progressHandler);
 
-  // Abort support
   let aborted = false;
   const abortHandler = () => {
     aborted = true;
@@ -188,6 +175,12 @@ async function compressWithFFmpeg(
 
   const data = await ff.readFile(outputName);
   const mimeType = isMp4 ? "video/mp4" : "video/webm";
+
+  // Critical: check for empty output (ffmpeg failed silently)
+  if (!data || (data as Uint8Array).length === 0) {
+    throw new Error("Compression produced no output. Try a different format or quality.");
+  }
+
   const blob = new Blob([data as BlobPart], { type: mimeType });
 
   // Cleanup FS
@@ -198,13 +191,15 @@ async function compressWithFFmpeg(
     /* noop */
   }
 
-  // Compute output dimensions
   let outW = srcInfo.width;
   let outH = srcInfo.height;
   if (opts.targetHeight > 0) {
-    const scale = Math.min(1, opts.targetHeight / Math.max(srcInfo.width, srcInfo.height));
-    outW = Math.round(srcInfo.width * scale / 2) * 2;
-    outH = Math.round(srcInfo.height * scale / 2) * 2;
+    const scale = Math.min(
+      1,
+      opts.targetHeight / Math.max(srcInfo.width, srcInfo.height)
+    );
+    outW = Math.round((srcInfo.width * scale) / 2) * 2;
+    outH = Math.round((srcInfo.height * scale) / 2) * 2;
   }
 
   return {
@@ -328,6 +323,11 @@ async function compressWithMediaRecorder(
     if (recorder.state !== "inactive") recorder.stop();
     opts.onProgress?.(1);
     const blob = await finished;
+
+    if (blob.size === 0) {
+      throw new Error("Compression produced no output.");
+    }
+
     return {
       blob,
       url: URL.createObjectURL(blob),

@@ -50,8 +50,9 @@ export function ResultCard({
   controls,
   warning,
 }: ResultCardProps) {
-  const pct = resultSize ? savedPercent(originalSize, resultSize) : 0;
-  const grew = resultSize ? resultSize > originalSize : false;
+  const hasResult = resultSize != null;
+  const pct = hasResult ? savedPercent(originalSize, resultSize!) : 0;
+  const grew = hasResult ? resultSize! > originalSize : false;
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -86,7 +87,7 @@ export function ResultCard({
                   {shortFileName(fileName, 40)}
                 </span>
               </div>
-              {resultSize ? (
+              {hasResult ? (
                 <Badge
                   className={cn(
                     "shrink-0",
@@ -118,14 +119,14 @@ export function ResultCard({
                     grew ? "text-amber-600" : "text-emerald-600"
                   )}
                 >
-                  {resultSize ? formatBytes(resultSize) : "…"}
+                  {hasResult ? formatBytes(resultSize!) : "…"}
                 </span>
                 {meta && (
                   <span className="text-xs text-muted-foreground">· {meta}</span>
                 )}
               </div>
               <div className="flex gap-2">
-                <Button size="sm" onClick={onDownload} disabled={!resultSize}>
+                <Button size="sm" onClick={onDownload} disabled={!hasResult}>
                   <Download className="mr-1.5 h-3.5 w-3.5" />
                   {downloadLabel}
                 </Button>
