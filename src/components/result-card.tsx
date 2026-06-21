@@ -52,7 +52,7 @@ export function ResultCard({
 }: ResultCardProps) {
   const hasResult = resultSize != null;
   const pct = hasResult ? savedPercent(originalSize, resultSize!) : 0;
-  const grew = hasResult ? resultSize! > originalSize : false;
+  const grew = pct < 0;
 
   // Defensive: if status is "done" but we have no result, show an error
   const effectiveStatus =
@@ -106,7 +106,7 @@ export function ResultCard({
                       : "bg-emerald-500 text-white"
                   )}
                 >
-                  {grew ? `+${Math.abs(100 - pct)}%` : `−${pct}%`}
+                  {grew ? `+${Math.abs(pct)}%` : `−${pct}%`}
                 </Badge>
               ) : null}
             </div>

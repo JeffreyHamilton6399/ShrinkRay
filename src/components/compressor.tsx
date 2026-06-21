@@ -273,7 +273,7 @@ function FileRow({
     const a = document.createElement("a");
     a.href = result.url;
     const base = item.file.name.replace(/\.[^.]+$/, "");
-    a.download = `${base}_compressed.${extFor(result.blob)}`;
+    a.download = `${base}_compressed.${extFor(result.blob, item.file.name)}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -285,7 +285,7 @@ function FileRow({
   };
 
   const pct = result ? savedPercent(item.file.size, result.size) : 0;
-  const grew = result ? result.size > item.file.size : false;
+  const grew = pct < 0;
 
   return (
     <div
@@ -328,7 +328,7 @@ function FileRow({
                 {formatBytes(result.size)}
               </span>
               <Badge className={cn("h-4 px-1 text-[10px]", grew ? "bg-amber-500 text-white" : "bg-emerald-500 text-white")}>
-                {grew ? `+${Math.abs(100 - pct)}%` : `−${pct}%`}
+                {grew ? `+${Math.abs(pct)}%` : `−${pct}%`}
               </Badge>
             </span>
           ) : null}
@@ -351,19 +351,36 @@ function KindIcon({ kind }: { kind: MediaKind }) {
   return <span>{icons[kind]}</span>;
 }
 
-function extFor(blob: Blob): string {
-  const t = blob.type;
+function extFor(blob: Blob, fileName?: string): string {
+  const t = blob.type.toLowerCase();
+  // Match by blob type
+  if (t.includes("gzip")) return "gz";
   if (t.includes("zip")) return "zip";
   if (t.includes("pdf")) return "pdf";
-  if (t.includes("mp3")) return "mp3";
+  if (t.includes("mp3") || t.includes("mpeg")) return "mp3";
   if (t.includes("mp4")) return "mp4";
   if (t.includes("webm")) return "webm";
-  if (t.includes("jpeg")) return "jpg";
+  if (t.includes("jpeg") || t.includes("jpg")) return "jpg";
   if (t.includes("webp")) return "webp";
   if (t.includes("png")) return "png";
   if (t.includes("svg")) return "svg";
   if (t.includes("avif")) return "avif";
-  if (t.includes("gzip")) return "gz";
+  if (t.includes("gltf-binary")) return "glb";
+  if (t.includes("gltf")) return "gltf";
+  if (t.includes("model/stl")) return "stl";
+  if (t.includes("model/ply")) return "ply";
+  if (t.includes("model/obj")) return "obj";
+  if (t.includes("text/plain")) return "txt";
+  if (t.includes("text/html")) return "html";
+  if (t.includes("text/css")) return "css";
+  if (t.includes("javascript")) return "js";
+  if (t.includes("json")) return "json";
+  if (t.includes("xml")) return "xml";
+  // Fallback: try to get extension from original filename
+  if (fileName) {
+    const ext = fileName.match(/\.([^.]+)$/)?.[1]?.toLowerCase();
+    if (ext) return ext;
+  }
   return "bin";
 }
 
@@ -425,11 +442,19 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
 function getVideoMeta(file: File): Promise<{ width: number; height: number; duration: number }> {
   return new Promise((resolve, reject) => {
     const v = document.createElement("video");
+    const url = URL.createObjectURL(file);
+    const cleanup = () => URL.revokeObjectURL(url);
     v.preload = "metadata";
     v.muted = true;
-    v.onloadedmetadata = () =>
-      resolve({ width: v.videoWidth, height: v.videoHeight, duration: v.duration });
-    v.onerror = () => reject(new Error("Could not read video"));
-    v.src = URL.createObjectURL(file);
+    v.onloadedmetadata = () => {
+      const meta = { width: v.videoWidth, height: v.videoHeight, duration: v.duration };
+      cleanup();
+      resolve(meta);
+    };
+    v.onerror = () => {
+      cleanup();
+      reject(new Error("Could not read video"));
+    };
+    v.src = url;
   });
 }

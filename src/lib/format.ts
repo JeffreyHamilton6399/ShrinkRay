@@ -4,16 +4,17 @@ export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   if (!Number.isFinite(bytes) || bytes < 0) return "—";
   const k = 1024;
-  const units = ["B", "KB", "MB", "GB"];
+  const units = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
   const value = bytes / Math.pow(k, i);
   return `${value.toFixed(value >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
+/** Returns savings percentage. Positive = smaller, negative = grew. */
 export function savedPercent(original: number, compressed: number): number {
   if (original <= 0) return 0;
   const pct = ((original - compressed) / original) * 100;
-  return Math.max(0, Math.round(pct));
+  return Math.round(pct);
 }
 
 export function formatDuration(seconds: number): string {

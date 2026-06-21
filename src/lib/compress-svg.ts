@@ -1,7 +1,8 @@
 /**
- * SVG minification — strips metadata, comments, whitespace, and redundant
- * attributes to shrink SVG files. Pure string processing, no dependencies.
- * Everything runs in the browser — nothing is uploaded.
+ * SVG minification — strips metadata, comments, whitespace, and editor
+ * namespaces to shrink SVG files. Safe: preserves id attributes (needed for
+ * <use href="#id"> references) and doesn't corrupt text content.
+ * Pure string processing, no dependencies. Everything runs in browser.
  */
 
 export interface CompressedSvg {
@@ -29,16 +30,13 @@ export async function compressSvg(file: File): Promise<CompressedSvg> {
   // 3. Remove metadata element
   out = out.replace(/<metadata[\s\S]*?<\/metadata>/gi, "");
 
-  // 4. Remove editor metadata (Inkscape, Sketch, Adobe)
+  // 4. Remove editor metadata (Inkscape, Sketch, Adobe) — safe to remove
   out = out.replace(/<sodipodi:[\s\S]*?<\/sodipodi:\w+>/gi, "");
   out = out.replace(/<inkscape:[\s\S]*?<\/inkscape:\w+>/gi, "");
   out = out.replace(/\s(?:sodipodi|inkscape):[a-z-]+="[^"]*"/gi, "");
 
-  // 5. Remove common redundant attributes
-  out = out.replace(/\s(?:id|data-name)="[^"]*"/gi, (match, _offset, full) => {
-    // Keep id if it's referenced (has #id reference somewhere) — simplified: remove all
-    return "";
-  });
+  // 5. NOTE: Do NOT strip id attributes — they're needed for <use href="#id">
+  //    and CSS selectors. Removing them breaks SVGs with references.
 
   // 6. Collapse whitespace between tags
   out = out.replace(/>\s+</g, "><");
@@ -56,20 +54,14 @@ export async function compressSvg(file: File): Promise<CompressedSvg> {
   // 10. Remove empty attributes (attr="")
   out = out.replace(/\s[a-z-]+=""/gi, "");
 
-  // 11. Lowercase tag and attribute names (SVG is case-sensitive for some,
-  //     but most are fine — skip this to be safe)
-
-  // 12. Decode and re-encode common entities to shortest form
-  out = out.replace(/&gt;/g, ">");
-  out = out.replace(/&lt;/g, "<");
-  // Re-encode only what's necessary
-  out = out.replace(/<(?![\/!?a-zA-Z])/g, "&lt;");
+  // NOTE: Do NOT decode/re-encode &lt; &gt; — that corrupts text content
+  // inside <text> nodes (e.g. "5 < 10" would be modified).
 
   const blob = new Blob([out], { type: "image/svg+xml" });
   return {
     blob,
     url: URL.createObjectURL(blob),
     size: blob.size,
-    originalSize: text.length,
+    originalSize: file.size, // use actual file size, not string length
   };
 }

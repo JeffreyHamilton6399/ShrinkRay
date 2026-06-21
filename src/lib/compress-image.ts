@@ -185,12 +185,14 @@ export async function compressImage(
     });
   }
 
-  // Never return a larger file — if compression made it bigger, return original
-  // (happens with tiny images, or PNG→JPEG conversion adding background fill)
+  // Never return a larger file — if compression made it bigger, return the
+  // best available version. For HEIC, return the decoded JPEG (browsers can't
+  // display HEIC). For other formats, return the original.
   if (blob.size >= file.size) {
+    const fallbackBlob = isHeic(file) ? workingFile : file;
     return {
-      blob: file,
-      url: URL.createObjectURL(file),
+      blob: fallbackBlob,
+      url: URL.createObjectURL(fallbackBlob),
       width: srcW,
       height: srcH,
     };

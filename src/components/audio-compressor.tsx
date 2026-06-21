@@ -57,10 +57,7 @@ export function AudioCompressor({ file, onClear }: Props) {
       setStatus("done");
       setProgress(100);
     } catch (e) {
-      if (controller.signal.aborted) {
-        setStatus("done");
-        return;
-      }
+      if (controller.signal.aborted) return; // new run will handle state
       setError(e instanceof Error ? e.message : "Compression failed");
       setStatus("error");
     }

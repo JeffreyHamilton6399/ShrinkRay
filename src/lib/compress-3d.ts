@@ -75,8 +75,8 @@ export async function compress3DModel(
     };
   }
 
-  if (ext === "gltf" && (opts.format === "glb" || opts.format === "draco-glb")) {
-    const glb = gltfToGlb(await file.text(), opts.format === "draco-glb");
+  if (ext === "gltf" && opts.format === "glb") {
+    const glb = gltfToGlb(await file.text());
     const blob = new Blob([glb], { type: "model/gltf-binary" });
     return {
       blob,
@@ -86,12 +86,7 @@ export async function compress3DModel(
     };
   }
 
-  if (ext === "glb" && opts.format === "draco-glb") {
-    // GLB with Draco — need Three.js to re-encode
-    return convertWithThree(file, "draco-glb", base);
-  }
-
-  // --- Cross-format conversion via Three.js (STL, OBJ, PLY → GLB) ---
+  // --- Cross-format conversion via Three.js (STL, OBJ, PLY, FBX, GLB → any) ---
   return convertWithThree(file, opts.format, base);
 }
 
@@ -151,7 +146,7 @@ function glbToGltf(buffer: ArrayBuffer): unknown {
   return json;
 }
 
-function gltfToGltf(gltfText: string, _draco: boolean): ArrayBuffer {
+function gltfToGlb(gltfText: string): ArrayBuffer {
   const gltf = JSON.parse(gltfText);
 
   // Extract the buffer (either embedded base64 or we can't handle external)

@@ -22,6 +22,9 @@ export function SvgCompressor({ file, onClear }: Props) {
   );
   const [error, setError] = React.useState<string | null>(null);
 
+  const originalUrl = React.useMemo(() => URL.createObjectURL(file), [file]);
+  React.useEffect(() => () => URL.revokeObjectURL(originalUrl), [originalUrl]);
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -78,7 +81,7 @@ export function SvgCompressor({ file, onClear }: Props) {
       progressLabel="Minifying SVG…"
       preview={
         <img
-          src={status === "done" && result ? result.url : URL.createObjectURL(file)}
+          src={status === "done" && result ? result.url : originalUrl}
           alt="SVG preview"
           className="max-h-44 max-w-full rounded-md bg-white p-2 object-contain"
         />
