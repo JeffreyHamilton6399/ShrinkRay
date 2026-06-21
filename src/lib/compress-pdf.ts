@@ -33,15 +33,15 @@ export function isPdf(file: File): boolean {
 }
 
 function qualityToJpeg(quality: number): number {
-  // Map 1..100 → 0.2..0.85 JPEG quality
+  // Map 1..100 → 0.15..0.7 JPEG quality (lower = smaller, faster)
   const q = Math.max(1, Math.min(100, quality));
-  return 0.2 + ((q - 1) / 99) * (0.85 - 0.2);
+  return 0.15 + ((q - 1) / 99) * (0.7 - 0.15);
 }
 
 function qualityToScale(quality: number): number {
-  // Map 1..100 → 1.0..2.0 render scale
+  // Map 1..100 → 0.8..1.5 render scale (lower = much faster rendering)
   const q = Math.max(1, Math.min(100, quality));
-  return 1.0 + ((q - 1) / 99) * 1.0;
+  return 0.8 + ((q - 1) / 99) * (1.5 - 0.8);
 }
 
 async function canvasToJpegBytes(
@@ -90,7 +90,7 @@ export async function compressPdf(
 
     // Cap render resolution so we never blow up memory on huge pages.
     const viewport0 = page.getViewport({ scale: 1 });
-    const maxLongSide = 2200;
+    const maxLongSide = 1500;
     const longSide = Math.max(viewport0.width, viewport0.height);
     const capScale = longSide > 0 ? Math.min(1, maxLongSide / longSide) : 1;
     const scale = baseScale * capScale;

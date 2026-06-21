@@ -327,10 +327,10 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   if (kind === "image") {
     const { compressImage } = await import("@/lib/compress-image");
     const r = await compressImage(file, {
-      quality: 0.7,
+      quality: 0.6,
       maxWidth: 1920,
       maxHeight: 1920,
-      format: "image/jpeg",
+      format: "image/webp",
       background: "#ffffff",
     });
     return { blob: r.blob, url: r.url, size: r.blob.size };
@@ -342,12 +342,12 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   }
   if (kind === "audio") {
     const { compressAudio } = await import("@/lib/compress-audio");
-    const r = await compressAudio(file, { bitrateKbps: 128, channels: "auto" });
+    const r = await compressAudio(file, { bitrateKbps: 96, channels: "auto" });
     return { blob: r.blob, url: r.url, size: r.blob.size };
   }
   if (kind === "pdf") {
     const { compressPdf } = await import("@/lib/compress-pdf");
-    const r = await compressPdf(file, { quality: 60 });
+    const r = await compressPdf(file, { quality: 45 });
     return { blob: r.blob, url: r.url, size: r.blob.size };
   }
   // video
@@ -355,7 +355,7 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
   const meta = await getVideoMeta(file);
   const r = await compressVideo(
     file,
-    { quality: 50, targetHeight: 480, format: "video/mp4" },
+    { quality: 45, targetHeight: 480, format: "video/mp4" },
     meta
   );
   return { blob: r.blob, url: r.url, size: r.blob.size };

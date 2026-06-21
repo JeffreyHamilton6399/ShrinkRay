@@ -40,8 +40,8 @@ export function ImageCompressor({ file, onClear }: Props) {
     "processing"
   );
   const [error, setError] = React.useState<string | null>(null);
-  const [quality, setQuality] = React.useState(70);
-  const [format, setFormat] = React.useState<ImageTargetFormat>("image/jpeg");
+  const [quality, setQuality] = React.useState(60);
+  const [format, setFormat] = React.useState<ImageTargetFormat>("image/webp");
   const [maxDim, setMaxDim] = React.useState(1920);
   const runIdRef = React.useRef(0);
 

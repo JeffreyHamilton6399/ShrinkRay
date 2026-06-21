@@ -146,20 +146,22 @@ async function compressWithFFmpeg(
     args.push(
       "-c:v", "libx264",
       "-preset", "ultrafast",
+      "-tune", "zerolatency",   // faster encoding, minimal buffering
       "-crf", String(crf),
       "-pix_fmt", "yuv420p",
-      // Copy audio when possible (avoids re-encoding = much faster)
-      "-c:a", "copy"
+      "-threads", "0",          // use all available threads
+      "-c:a", "copy"            // copy audio (no re-encode = much faster)
     );
   } else {
     args.push(
       "-c:v", "libvpx",
       "-deadline", "realtime",
-      "-cpu-used", "8",
+      "-cpu-used", "16",        // max speed for VP8
       "-crf", String(crf),
       "-b:v", "0",
+      "-row-mt", "1",           // multi-row threading
       "-c:a", "libopus",
-      "-b:a", "128k"
+      "-b:a", "96k"
     );
   }
 

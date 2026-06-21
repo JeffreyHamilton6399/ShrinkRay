@@ -30,7 +30,7 @@ export function AudioCompressor({ file, onClear }: Props) {
   );
   const [progress, setProgress] = React.useState(0);
   const [error, setError] = React.useState<string | null>(null);
-  const [bitrate, setBitrate] = React.useState(128);
+  const [bitrate, setBitrate] = React.useState(96);
   const [channels, setChannels] = React.useState<"auto" | 1 | 2>("auto");
   const abortRef = React.useRef<AbortController | null>(null);
 
