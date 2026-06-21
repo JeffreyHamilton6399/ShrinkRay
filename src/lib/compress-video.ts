@@ -138,10 +138,23 @@ async function loadFFmpeg(): Promise<{ ff: FFmpeg; engine: "ffmpeg-mt" | "ffmpeg
 /** Pre-warm the ffmpeg engine so it's ready when the user uploads a video. */
 export function preloadFFmpeg(): void {
   if (typeof window === "undefined") return;
-  // Kick off the load in the background — don't await.
   loadFFmpeg().catch(() => {
     /* ignore — will retry on actual use */
   });
+}
+
+/** Terminate ffmpeg and free its ~32MB memory. Call on mobile after compression. */
+export function terminateFFmpeg(): void {
+  if (ffmpegInstance) {
+    try {
+      ffmpegInstance.terminate();
+    } catch {
+      /* noop */
+    }
+    ffmpegInstance = null;
+    loadPromise = null;
+    loadedEngine = null;
+  }
 }
 
 function qualityToCrf(quality: number, format: VideoTargetFormat): number {

@@ -462,7 +462,14 @@ async function compressMini(file: File, kind: MediaKind): Promise<MiniResult> {
     const r = await compressPdf(file, { quality: 35 });
     return { blob: r.blob, url: r.url, size: r.blob.size };
   }
-  // video
+  // video — check mobile memory limits
+  const { maxVideoSize } = await import("@/lib/mobile");
+  if (file.size > maxVideoSize()) {
+    throw new Error(
+      `Video too large for this device (${(file.size / 1024 / 1024).toFixed(0)}MB). ` +
+      `Try a file under ${Math.round(maxVideoSize() / 1024 / 1024)}MB.`
+    );
+  }
   const { compressVideo } = await import("@/lib/compress-video");
   const meta = await getVideoMeta(file);
   const r = await compressVideo(

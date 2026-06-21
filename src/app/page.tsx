@@ -8,14 +8,17 @@ import { SettingsMenu } from "@/components/settings-menu";
 import { TermsGate } from "@/components/terms-gate";
 import { LogoMark } from "@/components/logo-mark";
 import { preloadFFmpeg } from "@/lib/compress-video";
+import { isLowMemoryDevice } from "@/lib/mobile";
 
 const DONATE_URL = "https://buymeacoffee.com/jeffreyscof";
 
 export default function Home() {
-  // Pre-warm the ffmpeg engine in the background as soon as the page loads,
-  // so it's ready by the time the user drops a video (saves ~3-4 seconds).
+  // Pre-warm the ffmpeg engine in the background on desktop only.
+  // On mobile, the 32MB download + parse freezes the browser.
   React.useEffect(() => {
-    preloadFFmpeg();
+    if (!isLowMemoryDevice()) {
+      preloadFFmpeg();
+    }
   }, []);
 
   return (

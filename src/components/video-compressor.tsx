@@ -17,9 +17,11 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import {
   compressVideo,
+  terminateFFmpeg,
   type VideoTargetFormat,
   type CompressedVideo,
 } from "@/lib/compress-video";
+import { maxVideoSize, isLowMemoryDevice } from "@/lib/mobile";
 
 interface SrcInfo {
   width: number;
@@ -82,8 +84,21 @@ export function VideoCompressor({ file, onClear }: Props) {
   const abortRef = React.useRef<AbortController | null>(null);
 
   // Load metadata on mount — reuse originalUrl (already created above).
+  // Also check file size for mobile devices (limited RAM).
   React.useEffect(() => {
     let cancelled = false;
+
+    // Mobile memory check — prevent browser crashes
+    const maxSize = maxVideoSize();
+    if (file.size > maxSize) {
+      setError(
+        `This video is ${(file.size / 1024 / 1024).toFixed(0)}MB — too large for ` +
+        `browser compression on this device. Try a file under ${Math.round(maxSize / 1024 / 1024)}MB.`
+      );
+      setStatus("error");
+      return;
+    }
+
     const v = document.createElement("video");
     v.preload = "metadata";
     v.muted = true;
@@ -148,6 +163,10 @@ export function VideoCompressor({ file, onClear }: Props) {
       setStatus("done");
       setEnginePhase(null);
       setProgress(100);
+      // Free ffmpeg memory on mobile (saves ~32MB RAM)
+      if (isLowMemoryDevice()) {
+        terminateFFmpeg();
+      }
     } catch (e) {
       if (controller.signal.aborted) return; // new run will handle state
       setError(
